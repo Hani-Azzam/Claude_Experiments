@@ -59,14 +59,17 @@ _Updated as milestones are built and tested._
 
 ---
 
-## Milestone 4 — Interiors & Inventory (`tlv-rpg-v4.html`)
+## Milestone 4 — Interiors & Inventory (`tlv-rpg-v4.html`) ✅
 
-- [ ] Door tile triggers room transition (fade effect)
-- [ ] Café interior room
-- [ ] Jaffa clock tower interior room
-- [ ] Collectable item on map (e.g. sea glass)
-- [ ] Inventory HUD strip (max 4 items)
-- [ ] NPC dialogue reacts to held item
+- [x] Door tile triggers room transition (fade effect)
+- [x] Café interior room (Cafe Yasmin)
+- [x] Additional interiors: Shuk HaCarmel, Old Jaffa House, Port Cafe
+- [x] Collectable items: sea shell (outdoor), coffee, halva, sea glass, postcard (in rooms)
+- [x] Inventory HUD strip (colored icon circles at bottom of screen)
+- [x] NPC dialogue reacts to held item
+- [x] Room-local NPCs: Shira (Shuk), Ibrahim (Old House), Yael (Port Cafe), Barista (Cafe)
+- [x] Pickup notification banner with item name + description
+- [x] Minimap hidden indoors, replaced with room name banner
 
 ---
 
