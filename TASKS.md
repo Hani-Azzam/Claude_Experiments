@@ -12,18 +12,21 @@ _Updated as milestones are built and tested._
 
 ---
 
-## Milestone 1 — World & Movement (`tlv-rpg-v1.html`)
+## Milestone 1 — World & Movement (`tlv-rpg-v1.html`) ✅
 
-- [ ] 640×480 landscape canvas setup with mobile viewport
-- [ ] Tilemap: 2D array, tile types (grass, sand, pavement, road, wall)
-- [ ] Tile renderer using `fillRect`
-- [ ] Player sprite (16×16, top-down ¾ view, rect-based)
-- [ ] 4-direction movement (WASD + arrow keys)
-- [ ] Collision detection against wall/building tiles
-- [ ] Camera follows player (world larger than viewport)
-- [ ] Touch D-pad (bottom-left)
-- [ ] Building footprints placed on map: Shuk HaCarmel, Beach, Old Jaffa Port, Dizengoff Square, café
-- [ ] Zone detection + location name HUD
+- [x] 640×480 landscape canvas setup with mobile viewport
+- [x] Tilemap: 2D array, tile types (grass, sand, pavement, road, wall, water, door)
+- [x] Tile renderer using `fillRect` + sprite sheet overlay
+- [x] Player sprite from Gemini sprite sheet (embedded base64)
+- [x] 4-direction movement (WASD + arrow keys), diagonal movement normalized
+- [x] Collision detection against wall/building/water tiles
+- [x] Camera follows player (80×60 tile world, 1280×960px)
+- [x] Touch D-pad (bottom-left)
+- [x] 9 buildings placed: Shuk HaCarmel, Café Yasmin, Jaffa Arch, Port Café, apt blocks
+- [x] 6 named zones: Dizengoff Square, Shuk, Rothschild, Beach, Old Jaffa, Jaffa Port
+- [x] Zone detection + animated location name HUD
+- [x] Mini-map (top-right) with player dot + viewport indicator
+- [x] Palm trees and lamp posts as props
 
 ---
 
