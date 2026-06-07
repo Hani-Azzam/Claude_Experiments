@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>TLV RPG — Sprite Sheet Layout Guide</title>
+<style>
+  body { background: #1a1a2e; color: #eee; font-family: monospace; padding: 24px; margin: 0; }
+  h1 { color: #f0c040; margin-bottom: 4px; font-size: 18px; }
+  p  { color: #aaa; margin: 0 0 24px; font-size: 13px; }
+  .sheet-wrapper { display: inline-block; position: relative; }
+  canvas { display: block; image-rendering: pixelated; border: 2px solid #444; }
+  .legend { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .swatch { width: 16px; height: 16px; border: 1px solid #555; flex-shrink: 0; }
+  .section-label { color: #f0c040; font-size: 13px; margin: 20px 0 8px; }
+  .info { background: #0d1b2a; border: 1px solid #334; padding: 16px; margin-top: 24px;
+          max-width: 640px; font-size: 13px; line-height: 1.7; color: #ccc; }
+  .info strong { color: #f0c040; }
+  code { background: #0a0a1a; padding: 2px 6px; border-radius: 3px; color: #7ec8e3; }
+</style>
+</head>
+<body>
+<h1>TLV RPG — Sprite Sheet Layout Guide</h1>
+<p>Use this as your template when drawing in Piskel or PixilArt. Total sheet: <strong>192 × 192 px</strong>, grid cell: <strong>16 px</strong>.</p>
+
+<canvas id="c" width="192" height="192"></canvas>
+
+<div class="info">
+  <strong>How to use this guide:</strong><br>
+  1. Open Piskel / PixilArt and set canvas to <code>192 × 192 px</code><br>
+  2. Enable the grid overlay at <code>16 px</code> cell size<br>
+  3. Draw each asset inside its labeled cell(s) — keep to the bounding box shown<br>
+  4. Export as <code>spritesheet.png</code> and add it to the repo<br><br>
+  <strong>Cell coordinates (col × row, 0-indexed, each unit = 16 px):</strong><br>
+  Player: col 0, row 0 — 16×16 px<br>
+  NPC 1–4: cols 1–4, row 0 — 16×16 px each<br>
+  Tiles (grass/sand/road/pavement/water): cols 0–4, row 1 — 16×16 px each<br>
+  Wall/door tiles: cols 5–6, row 1 — 16×16 px each<br>
+  Buildings (32×32 each, 2×2 cells): rows 2–5, cols 0–1 / 2–3 / 4–5 / 6–7<br>
+  Palm tree + lamp post: col 8–9, rows 2–3 — 16×32 px each<br>
+  Extras / decorations: row 6–7, any free cols
+</div>
+
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const W = 192, CELL = 16, COLS = W / CELL; // 12 cols x 12 rows
+
+// ── palette ──────────────────────────────────────────────
+const BG       = '#0d1117';
+const GRID     = '#2a2a3a';
+const OUTLINE  = '#444466';
+
+// section fill colors (just to show regions)
+const COL_PLAYER  = '#1a3a1a';
+const COL_NPC     = '#1a2a3a';
+const COL_TILE    = '#2a1a1a';
+const COL_BUILD   = '#2a2a1a';
+const COL_PROP    = '#1a2a2a';
+const COL_EXTRA   = '#2a1a2a';
+
+// ── draw background ──
+ctx.fillStyle = BG;
+ctx.fillRect(0, 0, W, W);
+
+// ── region fills ──────────────────────────────────────────
+function fillRegion(col, row, wCells, hCells, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(col * CELL, row * CELL, wCells * CELL, hCells * CELL);
+}
+
+// Row 0: player (col 0) + NPCs (cols 1–5)
+fillRegion(0, 0, 1, 1, COL_PLAYER);
+fillRegion(1, 0, 5, 1, COL_NPC);
+
+// Row 1: tiles (cols 0–6) + wall/door (cols 7–8)
+fillRegion(0, 1, 7, 1, COL_TILE);
+fillRegion(7, 1, 2, 1, OUTLINE + '55');
+
+// Rows 2–5: buildings (32×32 = 2×2 cells each) — 4 buildings
+fillRegion(0, 2, 2, 2, COL_BUILD);  // building A
+fillRegion(2, 2, 2, 2, COL_BUILD);  // building B
+fillRegion(4, 2, 2, 2, COL_BUILD);  // building C
+fillRegion(6, 2, 2, 2, COL_BUILD);  // building D — Jaffa arch
+
+// Props: col 8-9, rows 2-3 (16×32 tall sprites)
+fillRegion(8, 2, 1, 2, COL_PROP);   // palm tree
+fillRegion(9, 2, 1, 2, COL_PROP);   // lamp post
+
+// Rows 4–5 remainder + rows 6–7: extras
+fillRegion(8, 4, 4, 4, COL_EXTRA);
+fillRegion(0, 6, 8, 2, COL_EXTRA);
+
+// ── draw grid ──────────────────────────────────────────────
+ctx.strokeStyle = GRID;
+ctx.lineWidth = 0.5;
+for (let x = 0; x <= W; x += CELL) {
+  ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, W); ctx.stroke();
+}
+for (let y = 0; y <= W; y += CELL) {
+  ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+}
+
+// ── region outlines ──────────────────────────────────────
+function outlineRegion(col, row, wCells, hCells, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(col * CELL + 0.75, row * CELL + 0.75, wCells * CELL - 1.5, hCells * CELL - 1.5);
+}
+outlineRegion(0, 0, 1, 1, '#44cc44');
+outlineRegion(1, 0, 5, 1, '#44aaff');
+outlineRegion(0, 1, 7, 1, '#cc6644');
+outlineRegion(7, 1, 2, 1, '#cc6644');
+outlineRegion(0, 2, 2, 2, '#cccc44');
+outlineRegion(2, 2, 2, 2, '#cccc44');
+outlineRegion(4, 2, 2, 2, '#cccc44');
+outlineRegion(6, 2, 2, 2, '#cccc44');
+outlineRegion(8, 2, 1, 2, '#44cccc');
+outlineRegion(9, 2, 1, 2, '#44cccc');
+outlineRegion(8, 4, 4, 4, '#cc44cc');
+outlineRegion(0, 6, 8, 2, '#cc44cc');
+
+// ── labels ────────────────────────────────────────────────
+ctx.font = '5px monospace';
+ctx.textBaseline = 'top';
+
+function label(col, row, wCells, hCells, lines, color) {
+  ctx.fillStyle = color || '#fff';
+  const cx = col * CELL + wCells * CELL / 2;
+  const cy = row * CELL + hCells * CELL / 2 - (lines.length - 1) * 3;
+  ctx.textAlign = 'center';
+  lines.forEach((l, i) => ctx.fillText(l, cx, cy + i * 6));
+}
+
+label(0, 0, 1, 1, ['PLR'],    '#88ff88');
+label(1, 0, 1, 1, ['NPC','1'],'#88ccff');
+label(2, 0, 1, 1, ['NPC','2'],'#88ccff');
+label(3, 0, 1, 1, ['NPC','3'],'#88ccff');
+label(4, 0, 1, 1, ['NPC','4'],'#88ccff');
+label(5, 0, 1, 1, ['NPC','5'],'#88ccff');
+
+label(0, 1, 1, 1, ['GRS'],    '#ffaa88'); // grass
+label(1, 1, 1, 1, ['SND'],    '#ffaa88'); // sand
+label(2, 1, 1, 1, ['RD'],     '#ffaa88'); // road
+label(3, 1, 1, 1, ['PAV'],    '#ffaa88'); // pavement
+label(4, 1, 1, 1, ['H2O'],    '#ffaa88'); // water
+label(5, 1, 1, 1, ['SHB'],    '#ffaa88'); // sidewalk border
+label(6, 1, 1, 1, ['DOR'],    '#ffaa88'); // door tile
+label(7, 1, 1, 1, ['WL1'],    '#cccccc'); // wall 1
+label(8, 1, 1, 1, ['WL2'],    '#cccccc'); // wall 2
+
+label(0, 2, 2, 2, ['BAUHAUS', 'BLDG', '32×32'],   '#ffff88');
+label(2, 2, 2, 2, ['CAFÉ',    'BLDG', '32×32'],   '#ffff88');
+label(4, 2, 2, 2, ['SHUK',    'STALL','32×32'],   '#ffff88');
+label(6, 2, 2, 2, ['JAFFA',   'ARCH', '32×32'],   '#ffff88');
+
+label(8, 2, 1, 2, ['PALM', '16×32'], '#88ffff');
+label(9, 2, 1, 2, ['LAMP', '16×32'], '#88ffff');
+
+label(8, 4, 4, 4, ['EXTRAS /','DECOR','(free)'],   '#ff88ff');
+label(0, 6, 8, 2, ['EXTRAS / DECORATIONS (free use)'], '#ff88ff');
+
+// ── size annotations ─────────────────────────────────────
+ctx.fillStyle = '#666';
+ctx.font = '4px monospace';
+ctx.textAlign = 'left';
+ctx.fillText('192 px →', 2, W - 5);
+ctx.save();
+ctx.translate(W - 5, W - 2);
+ctx.rotate(-Math.PI / 2);
+ctx.fillText('192 px →', 0, 0);
+ctx.restore();
+</script>
+
+</body>
+</html>
