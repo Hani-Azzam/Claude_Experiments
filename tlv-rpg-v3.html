@@ -31,28 +31,30 @@ canvas {
 #dpad {
   position: absolute;
   bottom: 16px; left: 8px;
-  width: 352px; height: 352px;
+  width: 360px; height: 360px;
 }
 .dbtn {
-  position: absolute; width: 168px; height: 168px;
-  background: rgba(232,136,10,0.25);
-  border: 4px solid rgba(232,136,10,0.7);
-  border-radius: 16px; color: #e8880a; font-size: 52px;
+  position: absolute; width: 112px; height: 112px;
+  background: rgba(232,136,10,0.28);
+  border: 4px solid rgba(232,136,10,0.75);
+  border-radius: 50%; /* circle — no corners to overlap */
+  color: #e8880a; font-size: 42px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
-#btn-up    { top: 0;     left: 92px; }
-#btn-down  { top: 184px; left: 92px; }
-#btn-left  { top: 92px;  left: 0;    }
-#btn-right { top: 92px;  left: 184px; }
+/* Each button placed so its edges just touch — no overlap */
+#btn-up    { top: 0;    left: 124px; }
+#btn-down  { top: 248px; left: 124px; }
+#btn-left  { top: 124px; left: 0;    }
+#btn-right { top: 124px; left: 248px; }
 /* Talk button — bottom-right */
 #btn-talk {
   position: absolute; bottom: 24px; right: 8px;
-  width: 200px; height: 200px;
+  width: 180px; height: 180px;
   background: rgba(232,136,10,0.25);
   border: 4px solid rgba(245,208,96,0.9);
   border-radius: 50%;
-  color: #f5d060; font-size: 22px; font-weight: bold; font-family: monospace;
+  color: #f5d060; font-size: 20px; font-weight: bold; font-family: monospace;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
