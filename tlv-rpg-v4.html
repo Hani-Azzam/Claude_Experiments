@@ -410,8 +410,8 @@ function update(dt){
         const key=data.interior;
         S.indoor=key;
         const room=INTERIORS[key];
-        S.roomPx=Math.floor(room.roomW/2)*TILE;
-        S.roomPy=(room.roomH-2)*TILE;
+        S.roomPx=room.exitTile.x*TILE;
+        S.roomPy=Math.max(TILE,(room.exitTile.y-1)*TILE);
         S.dlg=null;
       } else if(action==='exit'){
         const b=BUILDINGS.find(b=>b.interior===S.indoor);
@@ -743,7 +743,7 @@ function drawRoom(){
 // HUD: inventory strip
 function drawInventory(){
   if(S.inventory.length===0) return;
-  const SLOT=28, PAD=4, startX=PAD, startY=VH-SLOT-PAD;
+  const SLOT=52, PAD=6, startX=PAD, startY=VH-SLOT-PAD;
   // All items metadata lookup
   const allItems=[
     ...WORLD_ITEMS,
@@ -765,7 +765,7 @@ function drawInventory(){
     ctx.fillStyle='rgba(245,208,96,0.15)'; ctx.fillRect(sx,sy,SLOT,SLOT);
     ctx.strokeStyle=P.gold; ctx.lineWidth=1; ctx.strokeRect(sx+0.5,sy+0.5,SLOT-1,SLOT-1);
     ctx.fillStyle=colorOf(id);
-    ctx.beginPath(); ctx.arc(sx+SLOT/2,sy+SLOT/2,8,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx+SLOT/2,sy+SLOT/2,14,0,Math.PI*2); ctx.fill();
   });
 }
 
@@ -774,18 +774,24 @@ function drawPickupBanner(){
   if(!S.lastPickup||S.itemDescTimer<=0) return;
   const alpha=Math.min(1,S.itemDescTimer*2);
   ctx.save(); ctx.globalAlpha=alpha;
-  ctx.font='bold 13px sans-serif';
-  const tw=ctx.measureText(S.lastPickup.label).width;
-  const BW=Math.max(tw+48,280), BH=52, BX=(VW-BW)/2, BY=VH/2-80;
-  ctx.fillStyle='rgba(10,18,36,0.95)'; ctx.fillRect(BX,BY,BW,BH);
-  ctx.strokeStyle=P.gold; ctx.lineWidth=2; ctx.strokeRect(BX+1,BY+1,BW-2,BH-2);
-  ctx.strokeStyle=P.orange; ctx.lineWidth=0.5; ctx.strokeRect(BX+4,BY+4,BW-8,BH-8);
+  const BW=420, PAD=20;
+  ctx.font='bold 22px sans-serif';
+  ctx.textAlign='left';
+  ctx.font='16px sans-serif';
+  const descLines=wrapText(ctx,S.lastPickup.desc,BW-PAD*2-20);
+  const BH=44+descLines.length*22+PAD;
+  const BX=(VW-BW)/2, BY=VH/2-100;
+  ctx.fillStyle='rgba(10,18,36,0.97)'; ctx.fillRect(BX,BY,BW,BH);
+  ctx.strokeStyle=P.gold; ctx.lineWidth=2.5; ctx.strokeRect(BX+1.25,BY+1.25,BW-2.5,BH-2.5);
+  ctx.strokeStyle=P.orange; ctx.lineWidth=1; ctx.strokeRect(BX+5,BY+5,BW-10,BH-10);
   // Item dot
-  ctx.fillStyle=P.gold; ctx.beginPath(); ctx.arc(BX+22,BY+BH/2,8,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle=P.cream; ctx.textAlign='left';
-  ctx.fillText('+ '+S.lastPickup.label,BX+38,BY+20);
-  ctx.font='12px sans-serif'; ctx.fillStyle=P.creamD;
-  ctx.fillText(S.lastPickup.desc,BX+16,BY+38);
+  ctx.fillStyle=P.gold; ctx.beginPath(); ctx.arc(BX+24,BY+28,10,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=P.navyDark; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('+',BX+24,BY+33);
+  ctx.font='bold 22px sans-serif'; ctx.fillStyle=P.cream; ctx.textAlign='left';
+  ctx.fillText(S.lastPickup.label,BX+44,BY+34);
+  ctx.font='16px sans-serif'; ctx.fillStyle=P.creamD;
+  descLines.forEach((line,i)=>ctx.fillText(line,BX+PAD,BY+56+i*22));
   ctx.restore();
 }
 
