@@ -30,14 +30,16 @@ _Updated as milestones are built and tested._
 
 ---
 
-## Milestone 2 — NPCs & Dialogue (`tlv-rpg-v2.html`)
+## Milestone 2 — NPCs & Dialogue (`tlv-rpg-v2.html`) ✅
 
-- [ ] 4–6 NPCs with positions on map
-- [ ] NPC faces player when nearby
-- [ ] Space / tap to trigger dialogue when adjacent
-- [ ] Canvas-drawn dialogue box (speaker name + text lines)
-- [ ] Dismiss dialogue on Space / tap
-- [ ] Unique flavor dialogue per NPC
+- [x] 6 named NPCs placed across all districts (Moshe, Shira, David, Noa, Ibrahim, Yael)
+- [x] NPC highlighted + [SPACE] prompt appears when player is in range
+- [x] Space / TALK button triggers dialogue
+- [x] Canvas-drawn dialogue box with speaker name tab + wrapped text
+- [x] Each NPC has 3 lines that cycle on repeat visits
+- [x] Movement blocked while dialogue open
+- [x] NPC dots shown on mini-map
+- [x] TALK button for mobile (bottom-right)
 
 ---
 
