@@ -31,7 +31,7 @@ canvas {
 #dpad {
   position: absolute;
   bottom: 16px; left: 8px;
-  width: 240px; height: 240px;
+  width: 224px; height: 224px;
 }
 .dbtn {
   position: absolute; width: 112px; height: 112px;
@@ -42,11 +42,11 @@ canvas {
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
-/* 8px gap between buttons */
-#btn-up    { top: 0;    left: 64px; }
-#btn-down  { top: 128px; left: 64px; }
-#btn-left  { top: 64px;  left: 0;   }
-#btn-right { top: 64px;  left: 128px; }
+/* buttons flush together, no gap */
+#btn-up    { top: 0;    left: 56px; }
+#btn-down  { top: 112px; left: 56px; }
+#btn-left  { top: 56px;  left: 0;   }
+#btn-right { top: 56px;  left: 112px; }
 /* Talk button — bottom-right */
 #btn-talk {
   position: absolute; bottom: 24px; right: 8px;
@@ -506,7 +506,7 @@ function drawDialogue(){
 }
 
 function drawMinimap(){
-  const MX=VW-152,MY=8,MW=144,MH=110;
+  const MX=VW-106,MY=8,MW=98,MH=76;
   const sx=MW/(COLS*TILE),sy=MH/(ROWS*TILE);
   // UI panel background + thick border
   ctx.fillStyle='rgba(10,18,36,0.92)';
