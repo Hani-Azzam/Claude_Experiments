@@ -30,29 +30,29 @@ canvas {
 /* D-pad — bigger for mobile, bottom-left */
 #dpad {
   position: absolute;
-  bottom: 24px; left: 16px;
-  width: 180px; height: 180px;
+  bottom: 16px; left: 8px;
+  width: 352px; height: 352px;
 }
 .dbtn {
-  position: absolute; width: 56px; height: 56px;
+  position: absolute; width: 168px; height: 168px;
   background: rgba(232,136,10,0.25);
-  border: 3px solid rgba(232,136,10,0.7);
-  border-radius: 8px; color: #e8880a; font-size: 22px;
+  border: 4px solid rgba(232,136,10,0.7);
+  border-radius: 16px; color: #e8880a; font-size: 52px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
-#btn-up    { top: 0;     left: 62px; }
-#btn-down  { top: 124px; left: 62px; }
-#btn-left  { top: 62px;  left: 0;    }
-#btn-right { top: 62px;  left: 124px; }
+#btn-up    { top: 0;     left: 92px; }
+#btn-down  { top: 184px; left: 92px; }
+#btn-left  { top: 92px;  left: 0;    }
+#btn-right { top: 92px;  left: 184px; }
 /* Talk button — bottom-right */
 #btn-talk {
-  position: absolute; bottom: 32px; right: 20px;
-  width: 88px; height: 88px;
+  position: absolute; bottom: 24px; right: 8px;
+  width: 200px; height: 200px;
   background: rgba(232,136,10,0.25);
-  border: 3px solid rgba(245,208,96,0.9);
+  border: 4px solid rgba(245,208,96,0.9);
   border-radius: 50%;
-  color: #f5d060; font-size: 16px; font-weight: bold; font-family: monospace;
+  color: #f5d060; font-size: 22px; font-weight: bold; font-family: monospace;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
@@ -480,26 +480,26 @@ function drawNPC(n,isNear){
 
 function drawDialogue(){
   const npc=S.dlg.npc,text=npc.lines[S.dlg.lineIdx];
-  const BOX_W=454,BOX_H=130,BOX_X=(VW-BOX_W)/2,BOX_Y=VH-BOX_H-100,PAD=16;
-  ctx.fillStyle='rgba(10,18,36,0.96)'; ctx.fillRect(BOX_X,BOX_Y,BOX_W,BOX_H);
+  const BOX_W=460,BOX_H=170,BOX_X=(VW-BOX_W)/2,BOX_Y=VH-BOX_H-108,PAD=18;
+  ctx.fillStyle='rgba(10,18,36,0.97)'; ctx.fillRect(BOX_X,BOX_Y,BOX_W,BOX_H);
   ctx.strokeStyle=P.orange; ctx.lineWidth=3;
   ctx.strokeRect(BOX_X+1.5,BOX_Y+1.5,BOX_W-3,BOX_H-3);
   ctx.strokeStyle=P.gold; ctx.lineWidth=1;
   ctx.strokeRect(BOX_X+5,BOX_Y+5,BOX_W-10,BOX_H-10);
   // Speaker name tab
-  ctx.font='bold 14px monospace';
+  ctx.font='bold 18px monospace';
   const nw=ctx.measureText(npc.name).width;
-  ctx.fillStyle=P.orange; ctx.fillRect(BOX_X+PAD-4,BOX_Y-22,nw+16,23);
+  ctx.fillStyle=P.orange; ctx.fillRect(BOX_X+PAD-4,BOX_Y-27,nw+18,28);
   ctx.strokeStyle=P.gold; ctx.lineWidth=1;
-  ctx.strokeRect(BOX_X+PAD-4,BOX_Y-22,nw+16,23);
+  ctx.strokeRect(BOX_X+PAD-4,BOX_Y-27,nw+18,28);
   ctx.fillStyle=P.ink; ctx.textAlign='left';
-  ctx.fillText(npc.name,BOX_X+PAD+2,BOX_Y-4);
-  // Dialogue text — larger, more readable
-  ctx.fillStyle=P.cream; ctx.font='bold 15px sans-serif';
+  ctx.fillText(npc.name,BOX_X+PAD+2,BOX_Y-5);
+  // Dialogue text
+  ctx.fillStyle=P.cream; ctx.font='bold 20px sans-serif';
   const wrapped=wrapText(ctx,text,BOX_W-PAD*2-8);
-  wrapped.forEach((line,i)=>ctx.fillText(line,BOX_X+PAD+4,BOX_Y+PAD+18+i*22));
+  wrapped.forEach((line,i)=>ctx.fillText(line,BOX_X+PAD+4,BOX_Y+PAD+22+i*28));
   // Prompt
-  ctx.fillStyle=P.gold; ctx.font='11px monospace'; ctx.textAlign='right';
+  ctx.fillStyle=P.gold; ctx.font='13px monospace'; ctx.textAlign='right';
   ctx.fillText('[SPACE / TALK]',BOX_X+BOX_W-PAD,BOX_Y+BOX_H-8);
 }
 
