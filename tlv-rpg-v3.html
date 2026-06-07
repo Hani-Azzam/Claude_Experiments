@@ -30,29 +30,29 @@ canvas {
 /* D-pad — bigger for mobile, bottom-left */
 #dpad {
   position: absolute;
-  bottom: 20px; left: 16px;
-  width: 136px; height: 136px;
+  bottom: 24px; left: 16px;
+  width: 180px; height: 180px;
 }
 .dbtn {
-  position: absolute; width: 42px; height: 42px;
-  background: rgba(232,136,10,0.22);
-  border: 2px solid rgba(232,136,10,0.65);
-  border-radius: 6px; color: #e8880a; font-size: 16px;
+  position: absolute; width: 56px; height: 56px;
+  background: rgba(232,136,10,0.25);
+  border: 3px solid rgba(232,136,10,0.7);
+  border-radius: 8px; color: #e8880a; font-size: 22px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
-#btn-up    { top: 0;    left: 47px; }
-#btn-down  { top: 94px; left: 47px; }
-#btn-left  { top: 47px; left: 0;    }
-#btn-right { top: 47px; left: 94px; }
-/* Talk button — bottom-right, nice and big */
+#btn-up    { top: 0;     left: 62px; }
+#btn-down  { top: 124px; left: 62px; }
+#btn-left  { top: 62px;  left: 0;    }
+#btn-right { top: 62px;  left: 124px; }
+/* Talk button — bottom-right */
 #btn-talk {
-  position: absolute; bottom: 28px; right: 20px;
-  width: 68px; height: 68px;
-  background: rgba(232,136,10,0.22);
-  border: 3px solid rgba(245,208,96,0.85);
+  position: absolute; bottom: 32px; right: 20px;
+  width: 88px; height: 88px;
+  background: rgba(232,136,10,0.25);
+  border: 3px solid rgba(245,208,96,0.9);
   border-radius: 50%;
-  color: #f5d060; font-size: 13px; font-weight: bold; font-family: monospace;
+  color: #f5d060; font-size: 16px; font-weight: bold; font-family: monospace;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
@@ -480,23 +480,26 @@ function drawNPC(n,isNear){
 
 function drawDialogue(){
   const npc=S.dlg.npc,text=npc.lines[S.dlg.lineIdx];
-  const BOX_W=440,BOX_H=100,BOX_X=(VW-BOX_W)/2,BOX_Y=VH-BOX_H-80,PAD=14;
+  const BOX_W=454,BOX_H=130,BOX_X=(VW-BOX_W)/2,BOX_Y=VH-BOX_H-100,PAD=16;
   ctx.fillStyle='rgba(10,18,36,0.96)'; ctx.fillRect(BOX_X,BOX_Y,BOX_W,BOX_H);
   ctx.strokeStyle=P.orange; ctx.lineWidth=3;
   ctx.strokeRect(BOX_X+1.5,BOX_Y+1.5,BOX_W-3,BOX_H-3);
   ctx.strokeStyle=P.gold; ctx.lineWidth=1;
   ctx.strokeRect(BOX_X+5,BOX_Y+5,BOX_W-10,BOX_H-10);
-  ctx.font='bold 10px monospace';
+  // Speaker name tab
+  ctx.font='bold 14px monospace';
   const nw=ctx.measureText(npc.name).width;
-  ctx.fillStyle=P.orange; ctx.fillRect(BOX_X+PAD-4,BOX_Y-17,nw+14,18);
+  ctx.fillStyle=P.orange; ctx.fillRect(BOX_X+PAD-4,BOX_Y-22,nw+16,23);
   ctx.strokeStyle=P.gold; ctx.lineWidth=1;
-  ctx.strokeRect(BOX_X+PAD-4,BOX_Y-17,nw+14,18);
+  ctx.strokeRect(BOX_X+PAD-4,BOX_Y-22,nw+16,23);
   ctx.fillStyle=P.ink; ctx.textAlign='left';
-  ctx.fillText(npc.name,BOX_X+PAD+2,BOX_Y-2);
-  ctx.fillStyle=P.cream; ctx.font='11px monospace';
+  ctx.fillText(npc.name,BOX_X+PAD+2,BOX_Y-4);
+  // Dialogue text — larger, more readable
+  ctx.fillStyle=P.cream; ctx.font='bold 15px sans-serif';
   const wrapped=wrapText(ctx,text,BOX_W-PAD*2-8);
-  wrapped.forEach((line,i)=>ctx.fillText(line,BOX_X+PAD+4,BOX_Y+PAD+16+i*17));
-  ctx.fillStyle=P.gold; ctx.font='8px monospace'; ctx.textAlign='right';
+  wrapped.forEach((line,i)=>ctx.fillText(line,BOX_X+PAD+4,BOX_Y+PAD+18+i*22));
+  // Prompt
+  ctx.fillStyle=P.gold; ctx.font='11px monospace'; ctx.textAlign='right';
   ctx.fillText('[SPACE / TALK]',BOX_X+BOX_W-PAD,BOX_Y+BOX_H-8);
 }
 
