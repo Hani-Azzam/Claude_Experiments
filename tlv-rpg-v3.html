@@ -31,22 +31,22 @@ canvas {
 #dpad {
   position: absolute;
   bottom: 16px; left: 8px;
-  width: 360px; height: 360px;
+  width: 240px; height: 240px;
 }
 .dbtn {
   position: absolute; width: 112px; height: 112px;
   background: rgba(232,136,10,0.28);
   border: 4px solid rgba(232,136,10,0.75);
-  border-radius: 50%; /* circle — no corners to overlap */
+  border-radius: 50%;
   color: #e8880a; font-size: 42px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
-/* Each button placed so its edges just touch — no overlap */
-#btn-up    { top: 0;    left: 124px; }
-#btn-down  { top: 248px; left: 124px; }
-#btn-left  { top: 124px; left: 0;    }
-#btn-right { top: 124px; left: 248px; }
+/* 8px gap between buttons */
+#btn-up    { top: 0;    left: 64px; }
+#btn-down  { top: 128px; left: 64px; }
+#btn-left  { top: 64px;  left: 0;   }
+#btn-right { top: 64px;  left: 128px; }
 /* Talk button — bottom-right */
 #btn-talk {
   position: absolute; bottom: 24px; right: 8px;
@@ -506,11 +506,15 @@ function drawDialogue(){
 }
 
 function drawMinimap(){
-  const MX=VW-218,MY=8,MW=210,MH=162;
+  const MX=VW-152,MY=8,MW=144,MH=110;
   const sx=MW/(COLS*TILE),sy=MH/(ROWS*TILE);
-  ctx.fillStyle=P.navyDark; ctx.fillRect(MX-2,MY-2,MW+4,MH+4);
-  ctx.strokeStyle=P.orange; ctx.lineWidth=1.5;
-  ctx.strokeRect(MX-1.75,MY-1.75,MW+3.5,MH+3.5);
+  // UI panel background + thick border
+  ctx.fillStyle='rgba(10,18,36,0.92)';
+  ctx.fillRect(MX-6,MY-6,MW+12,MH+12);
+  ctx.strokeStyle=P.orange; ctx.lineWidth=4;
+  ctx.strokeRect(MX-5,MY-5,MW+10,MH+10);
+  ctx.strokeStyle=P.gold; ctx.lineWidth=1.5;
+  ctx.strokeRect(MX-1,MY-1,MW+2,MH+2);
   ctx.fillStyle=P.olive;   ctx.fillRect(MX,MY,MW,MH);
   ctx.fillStyle=P.sand;    ctx.fillRect(MX,MY+21*TILE*sy,MW,3*TILE*sy);
   ctx.fillStyle=P.water;   ctx.fillRect(MX,MY+24*TILE*sy,MW,8*TILE*sy);
