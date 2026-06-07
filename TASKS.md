@@ -43,15 +43,19 @@ _Updated as milestones are built and tested._
 
 ---
 
-## Milestone 3 — Art Pass (`tlv-rpg-v3.html`)
+## Milestone 3 — Art Pass (`tlv-rpg-v3.html`) ✅
 
-- [ ] Present 3 visual style options to user → await approval
-- [ ] Apply agreed color palette to all tiles
-- [ ] Player walk animation (2-frame cycle)
-- [ ] Distinct NPC sprites per character type
-- [ ] Bauhaus buildings, Jaffa stone walls, palm trees, beach sand
-- [ ] Day sky gradient background
-- [ ] Door tiles on buildings
+- [x] Presented 3 style options → user chose "Jaffa Orange Crate Label"
+- [x] Full palette applied: navy · terracotta · citrus gold · olive · cream
+- [x] Tile textures: grass dots, road dashes, pavement grid, sand speckle, water shimmer
+- [x] 5 building types with distinct art: Bauhaus, market, café, Jaffa arch, stone house
+- [x] Player 2-frame walk animation with facing direction (up/down/left/right)
+- [x] 6 distinct NPC sprites (different body colors per character)
+- [x] Palm trees with fronds + lamp posts drawn procedurally
+- [x] Zone label as terracotta banner with gold double-border
+- [x] Dialogue box styled as crate label (orange/gold double border)
+- [x] Decorative crate-label border around entire canvas
+- [x] Mini-map updated with full palette
 
 ---
 

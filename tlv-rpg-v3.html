@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Tel Aviv & Jaffa RPG</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0e1828;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  overflow: hidden;
+  touch-action: none;
+}
+#wrapper { position: relative; width: 640px; height: 480px; }
+canvas { display: block; width: 640px; height: 480px; image-rendering: pixelated; }
+
+/* D-pad */
+#dpad { position: absolute; bottom: 16px; left: 16px; width: 96px; height: 96px; }
+.dbtn {
+  position: absolute; width: 28px; height: 28px;
+  background: rgba(232,136,10,0.2);
+  border: 2px solid rgba(232,136,10,0.6);
+  border-radius: 3px; color: #e8880a; font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+#btn-up    { top: 0;    left: 34px; }
+#btn-down  { top: 68px; left: 34px; }
+#btn-left  { top: 34px; left: 0;    }
+#btn-right { top: 34px; left: 68px; }
+/* Talk button */
+#btn-talk {
+  position: absolute; bottom: 20px; right: 20px;
+  width: 50px; height: 50px;
+  background: rgba(232,136,10,0.2);
+  border: 2px solid rgba(245,208,96,0.8);
+  border-radius: 50%;
+  color: #f5d060; font-size: 10px; font-weight: bold; font-family: monospace;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+}
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <canvas id="game" width="640" height="480"></canvas>
+  <div id="dpad">
+    <div class="dbtn" id="btn-up">&#9650;</div>
+    <div class="dbtn" id="btn-down">&#9660;</div>
+    <div class="dbtn" id="btn-left">&#9664;</div>
+    <div class="dbtn" id="btn-right">&#9654;</div>
+  </div>
+  <div id="btn-talk">TALK</div>
+</div>
+<script>
+// 1. CONSTANTS
+const TILE  = 16;
+const COLS  = 80;
+const ROWS  = 60;
+const VW    = 640;
+const VH    = 480;
+const SPEED = 100;
+const STEP  = 1000 / 60;
+const TALK_DIST = TILE * 2.2;
+
+// Tile IDs
+const T_GRASS=0,T_ROAD=1,T_PAV=2,T_SAND=3,T_WATER=4,T_BLDG=5,T_WALL=6;
+function solid(t){return t===T_BLDG||t===T_WALL||t===T_WATER;}
+
+// ── JAFFA ORANGE CRATE PALETTE ────────────────────────────────
+const P = {
+  navy:      '#1a2a4a',
+  navyDark:  '#0e1828',
+  terracotta:'#c84b1e',
+  terracottaL:'#d96030',
+  orange:    '#e8880a',
+  gold:      '#f5d060',
+  olive:     '#4a8c3f',
+  oliveD:    '#2e5a28',
+  cream:     '#e8d8b0',
+  creamD:    '#c8b890',
+  sand:      '#d4b870',
+  water:     '#2a6a9a',
+  waterL:    '#3a88cc',
+  waterShine:'#5aaad8',
+  roadDark:  '#1e1e2e',
+  roadLine:  '#3a3a5a',
+  white:     '#f5f0e0',
+  ink:       '#111828',
+};
+
+// Tile base colors
+const TILE_COLOR=[
+  P.olive,      // 0 grass
+  P.roadDark,   // 1 road
+  P.creamD,     // 2 pavement
+  P.sand,       // 3 sand
+  P.water,      // 4 water
+  P.terracotta, // 5 building (overridden by drawBuilding)
+  P.navyDark,   // 6 wall
+];
+
+// ── DATA ──────────────────────────────────────────────────────
+const ZONES=[
+  {name:'Dizengoff Square',x1:4,y1:2,x2:20,y2:19},
+  {name:'Shuk HaCarmel',   x1:22,y1:2,x2:41,y2:19},
+  {name:'Rothschild Blvd', x1:44,y1:2,x2:63,y2:19},
+  {name:'Tel Aviv Beach',  x1:2,y1:21,x2:77,y2:27},
+  {name:'Old Jaffa',       x1:2,y1:35,x2:35,y2:57},
+  {name:'Jaffa Port',      x1:38,y1:35,x2:77,y2:57},
+];
+
+// Buildings: type controls art style
+// type: 'bauhaus' | 'market' | 'cafe' | 'arch' | 'stone'
+const BUILDINGS=[
+  {x:5, y:4, w:5,h:7, label:'Apt. Block',    type:'bauhaus'},
+  {x:12,y:4, w:5,h:7, label:'Apt. Block',    type:'bauhaus'},
+  {x:24,y:4, w:6,h:7, label:'Shuk HaCarmel', type:'market'},
+  {x:33,y:4, w:5,h:7, label:'Cafe Yasmin',   type:'cafe'},
+  {x:46,y:4, w:5,h:7, label:'Apt. Block',    type:'bauhaus'},
+  {x:54,y:4, w:5,h:7, label:'Apt. Block',    type:'bauhaus'},
+  {x:5, y:37,w:7,h:9, label:'Jaffa Arch',    type:'arch'},
+  {x:18,y:38,w:5,h:8, label:'Old House',     type:'stone'},
+  {x:42,y:37,w:6,h:8, label:'Port Cafe',     type:'cafe'},
+];
+
+// Prop positions: palm trees and lamp posts
+const PALMS=[
+  {x:3,y:5},{x:20,y:5},{x:22,y:12},{x:42,y:5},{x:64,y:5},
+  {x:5,y:22},{x:18,y:22},{x:35,y:22},{x:52,y:22},{x:68,y:22},
+  {x:3,y:38},{x:36,y:38},{x:66,y:38},
+];
+const LAMPS=[
+  {x:7,y:3},{x:7,y:18},{x:23,y:3},{x:23,y:18},
+  {x:44,y:3},{x:44,y:18},{x:65,y:3},{x:65,y:18},
+  {x:7,y:36},{x:36,y:36},{x:65,y:36},
+];
+
+const NPCS=[
+  {tx:10,ty:12,name:'Moshe',  lines:["Shalom! First time in Tel Aviv?","The falafel on Ibn Gabirol — don't miss it.","Everyone here is from somewhere else. That's the whole point."]},
+  {tx:28,ty:8, name:'Shira',  lines:["Welcome to the Shuk! Try the halva, trust me.","I've been selling spices here for twenty years. My father before me.","Come back on Friday — the whole city turns up."]},
+  {tx:50,ty:12,name:'David',  lines:["Rothschild is beautiful, yes? The Bauhaus buildings.","This boulevard was designed for people, not cars. Rare.","I do my best thinking on this bench. Don't tell my boss."]},
+  {tx:30,ty:25,name:'Noa',    lines:["The Mediterranean is warmest in October. Counterintuitive.","I swim here every morning. Even in January.","Watch out for jellyfish season — August is rough."]},
+  {tx:12,ty:44,name:'Ibrahim',lines:["Jaffa is three thousand years old. Tel Aviv is one hundred.","The port here — fishermen were here long before the tourists.","You can see the whole coastline from the top of the minaret."]},
+  {tx:50,ty:44,name:'Yael',   lines:["The best coffee in Jaffa. No argument.","People think Tel Aviv and Jaffa are separate. We're the same city.","Stay for sunset. The light on the water — you'll understand everything."]},
+];
+
+// 2. BUILD MAP
+function buildMap(){
+  const map=Array.from({length:ROWS},()=>new Uint8Array(COLS));
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(r===0||r===ROWS-1||c===0||c===COLS-1){map[r][c]=T_WALL;continue;}
+    if(r>=24&&r<=31){map[r][c]=T_WATER;continue;}
+    if(r>=21&&r<24){map[r][c]=T_SAND;continue;}
+    if(r>31&&r<=33){map[r][c]=T_SAND;continue;}
+    if(r>=34){map[r][c]=T_PAV;continue;}
+    map[r][c]=T_GRASS;
+  }
+  for(let c=1;c<COLS-1;c++){
+    map[2][c]=T_ROAD; map[20][c]=T_ROAD; map[35][c]=T_ROAD;
+    if(map[3][c]===T_GRASS)  map[3][c]=T_PAV;
+    if(map[19][c]===T_GRASS) map[19][c]=T_PAV;
+  }
+  for(let r=1;r<ROWS-1;r++)
+    [1,21,43,65].forEach(c=>{if(map[r][c]!==T_WATER)map[r][c]=T_ROAD;});
+  for(const b of BUILDINGS)
+    for(let dr=0;dr<b.h;dr++) for(let dc=0;dc<b.w;dc++){
+      const row=b.y+dr,col=b.x+dc;
+      if(row>0&&row<ROWS-1&&col>0&&col<COLS-1) map[row][col]=T_BLDG;
+    }
+  return map;
+}
+
+// 3. STATE
+const S={
+  px:10*TILE,py:10*TILE,camX:0,camY:0,
+  keys:{},touch:{up:false,down:false,left:false,right:false},
+  map:buildMap(),
+  zoneName:'',zoneTimer:0,zoneAlpha:0,
+  dlg:null,nearNpc:null,spaceWasDown:false,
+  walkFrame:0,walkTimer:0,facing:'down',
+};
+
+// 4. HELPERS
+function wrapText(ctx,text,maxW){
+  const words=text.split(' '),lines=[];
+  let cur='';
+  for(const w of words){
+    const test=cur?cur+' '+w:w;
+    if(ctx.measureText(test).width>maxW&&cur){lines.push(cur);cur=w;}
+    else cur=test;
+  }
+  if(cur)lines.push(cur);
+  return lines;
+}
+function tryTalk(){
+  if(S.dlg){
+    const npc=S.dlg.npc;
+    npc._lineIdx=((npc._lineIdx||0)+1)%npc.lines.length;
+    S.dlg=null; return;
+  }
+  if(S.nearNpc) S.dlg={npc:S.nearNpc,lineIdx:(S.nearNpc._lineIdx||0)%S.nearNpc.lines.length};
+}
+
+// 5. COLLISION & CHECKS
+function canMove(px,py){
+  const m=3;
+  const x0=Math.floor((px+m)/TILE),x1=Math.floor((px+TILE-m-1)/TILE);
+  const y0=Math.floor((py+m)/TILE),y1=Math.floor((py+TILE-m-1)/TILE);
+  return !solid(S.map[y0][x0])&&!solid(S.map[y0][x1])&&
+         !solid(S.map[y1][x0])&&!solid(S.map[y1][x1]);
+}
+function checkZone(){
+  const tx=Math.floor((S.px+TILE/2)/TILE),ty=Math.floor((S.py+TILE/2)/TILE);
+  let found='';
+  for(const z of ZONES) if(tx>=z.x1&&tx<=z.x2&&ty>=z.y1&&ty<=z.y2){found=z.name;break;}
+  if(found&&found!==S.zoneName){S.zoneName=found;S.zoneAlpha=1;S.zoneTimer=3;}
+}
+function checkNearNpc(){
+  const cx=S.px+TILE/2,cy=S.py+TILE/2;
+  let best=null,bestDist=TALK_DIST;
+  for(const n of NPCS){
+    const d=Math.hypot(cx-n.tx*TILE-TILE/2,cy-n.ty*TILE-TILE/2);
+    if(d<bestDist){bestDist=d;best=n;}
+  }
+  S.nearNpc=best;
+}
+
+// 6. UPDATE
+function update(dt){
+  if(!S.dlg){
+    const k=S.keys,t=S.touch;
+    const up=k['ArrowUp']||k['w']||k['W']||t.up;
+    const down=k['ArrowDown']||k['s']||k['S']||t.down;
+    const left=k['ArrowLeft']||k['a']||k['A']||t.left;
+    const right=k['ArrowRight']||k['d']||k['D']||t.right;
+    let dx=0,dy=0;
+    if(up)dy-=1; if(down)dy+=1; if(left)dx-=1; if(right)dx+=1;
+    if(dx&&dy){dx*=0.707;dy*=0.707;}
+    const moving=dx||dy;
+    if(moving){
+      // walk animation
+      S.walkTimer+=dt;
+      if(S.walkTimer>0.18){S.walkTimer=0;S.walkFrame=1-S.walkFrame;}
+      if(right)S.facing='right'; else if(left)S.facing='left';
+      else if(up)S.facing='up'; else if(down)S.facing='down';
+    } else {
+      S.walkFrame=0; S.walkTimer=0;
+    }
+    const nx=S.px+dx*SPEED*dt,ny=S.py+dy*SPEED*dt;
+    if(canMove(nx,S.py))S.px=nx;
+    if(canMove(S.px,ny))S.py=ny;
+    S.px=Math.max(TILE,Math.min(S.px,(COLS-2)*TILE));
+    S.py=Math.max(TILE,Math.min(S.py,(ROWS-2)*TILE));
+  }
+  S.camX=Math.max(0,Math.min(Math.round(S.px+TILE/2-VW/2),COLS*TILE-VW));
+  S.camY=Math.max(0,Math.min(Math.round(S.py+TILE/2-VH/2),ROWS*TILE-VH));
+  if(S.zoneTimer>0){S.zoneTimer-=dt;S.zoneAlpha=S.zoneTimer>0.5?1:Math.max(0,S.zoneTimer/0.5);}
+  checkZone(); checkNearNpc();
+  const spaceNow=!!S.keys[' ']||!!S.keys['Enter'];
+  if(spaceNow&&!S.spaceWasDown)tryTalk();
+  S.spaceWasDown=spaceNow;
+}
+
+// 7. DRAW FUNCTIONS
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+
+// Draw tile with texture detail
+function drawTile(t,px,py){
+  ctx.fillStyle=TILE_COLOR[t];
+  ctx.fillRect(px,py,TILE,TILE);
+  if(t===T_GRASS){
+    // subtle olive texture dots
+    ctx.fillStyle=P.oliveD;
+    if(((px+py)/TILE|0)%3===0) ctx.fillRect(px+4,py+5,2,2);
+    if(((px+py)/TILE|0)%5===1) ctx.fillRect(px+10,py+11,2,2);
+  } else if(t===T_ROAD){
+    // lane dashes
+    ctx.fillStyle=P.roadLine;
+    ctx.fillRect(px,py,TILE,TILE);
+    ctx.fillStyle='rgba(255,220,80,0.15)';
+    if(px%(TILE*4)<TILE) ctx.fillRect(px+6,py+7,4,2);
+  } else if(t===T_PAV){
+    // stone grid lines
+    ctx.strokeStyle='rgba(0,0,0,0.12)';
+    ctx.lineWidth=0.5;
+    ctx.strokeRect(px+0.25,py+0.25,TILE-0.5,TILE-0.5);
+  } else if(t===T_SAND){
+    // warm speckle
+    ctx.fillStyle='rgba(200,160,60,0.3)';
+    if(((px*3+py*7)/TILE|0)%4===0) ctx.fillRect(px+3,py+8,3,3);
+  } else if(t===T_WATER){
+    // wave shimmer lines
+    ctx.fillStyle=P.waterL;
+    const phase=(px/TILE+py/TILE)%2;
+    ctx.fillRect(px+2,py+(phase===0?4:10),12,2);
+    ctx.fillStyle=P.waterShine;
+    ctx.fillRect(px+4,py+(phase===0?5:11),5,1);
+  }
+}
+
+// Draw a building with type-specific art
+function drawBuilding(b){
+  const wx=b.x*TILE,wy=b.y*TILE,bw=b.w*TILE,bh=b.h*TILE;
+
+  if(b.type==='bauhaus'){
+    // White Bauhaus: cream facade, flat roof, orange accent band
+    ctx.fillStyle=P.cream;
+    ctx.fillRect(wx,wy,bw,bh);
+    // Terracotta roof band
+    ctx.fillStyle=P.terracotta;
+    ctx.fillRect(wx,wy,bw,TILE-2);
+    // Orange horizontal stripe mid-building
+    ctx.fillStyle=P.orange;
+    ctx.fillRect(wx,wy+Math.floor(bh/2)-2,bw,3);
+    // Windows — navy recessed
+    ctx.fillStyle=P.navy;
+    for(let wr=1;wr<b.h-1;wr++)
+      for(let wc=0;wc<b.w;wc++)
+        if(!((wr===Math.floor(b.h/2))&&(wc===Math.floor(b.w/2))))
+          ctx.fillRect(wx+wc*TILE+4,wy+wr*TILE+3,8,8);
+    // Window shine
+    ctx.fillStyle='rgba(245,208,96,0.4)';
+    for(let wr=1;wr<b.h-1;wr++)
+      for(let wc=0;wc<b.w;wc++)
+        ctx.fillRect(wx+wc*TILE+4,wy+wr*TILE+3,3,2);
+    // Outline
+    ctx.strokeStyle=P.terracotta;
+    ctx.lineWidth=1.5;
+    ctx.strokeRect(wx+0.75,wy+0.75,bw-1.5,bh-1.5);
+
+  } else if(b.type==='market'){
+    // Shuk: terracotta with striped awning
+    ctx.fillStyle=P.terracotta;
+    ctx.fillRect(wx,wy,bw,bh);
+    // Awning stripes at bottom two rows
+    for(let s=0;s<bw;s+=6){
+      ctx.fillStyle=s%12<6?P.gold:P.orange;
+      ctx.fillRect(wx+s,wy+bh-TILE*2,6,TILE*2);
+    }
+    // Goods hanging — little dots
+    ctx.fillStyle=P.navy;
+    for(let wc=0;wc<b.w;wc++)
+      for(let wr=1;wr<b.h-2;wr++)
+        ctx.fillRect(wx+wc*TILE+5,wy+wr*TILE+5,6,6);
+    ctx.strokeStyle=P.gold;
+    ctx.lineWidth=1.5;
+    ctx.strokeRect(wx+0.75,wy+0.75,bw-1.5,bh-1.5);
+
+  } else if(b.type==='cafe'){
+    // Café: cream with orange awning and round window
+    ctx.fillStyle=P.creamD;
+    ctx.fillRect(wx,wy,bw,bh);
+    ctx.fillStyle=P.orange;
+    ctx.fillRect(wx,wy,bw,TILE);   // awning
+    // Awning scallop edge
+    ctx.fillStyle=P.gold;
+    for(let s=0;s<bw;s+=8)
+      ctx.fillRect(wx+s,wy+TILE-4,7,4);
+    // Windows
+    ctx.fillStyle=P.navy;
+    for(let wc=0;wc<b.w;wc++)
+      for(let wr=1;wr<b.h-2;wr++)
+        ctx.fillRect(wx+wc*TILE+4,wy+wr*TILE+3,8,8);
+    // Round window top center
+    ctx.beginPath();
+    ctx.arc(wx+bw/2,wy+TILE+8,6,0,Math.PI*2);
+    ctx.fillStyle=P.gold;
+    ctx.fill();
+    ctx.fillStyle=P.navy;
+    ctx.beginPath();
+    ctx.arc(wx+bw/2,wy+TILE+8,4,0,Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle=P.terracotta;
+    ctx.lineWidth=1.5;
+    ctx.strokeRect(wx+0.75,wy+0.75,bw-1.5,bh-1.5);
+
+  } else if(b.type==='arch'){
+    // Jaffa arch: stone, warm limestone
+    ctx.fillStyle='#b8966a';
+    ctx.fillRect(wx,wy,bw,bh);
+    // Stone block lines
+    ctx.strokeStyle='rgba(80,50,20,0.3)';
+    ctx.lineWidth=0.5;
+    for(let wr=0;wr<b.h;wr++) ctx.strokeRect(wx,wy+wr*TILE,bw,TILE);
+    for(let wc=0;wc<b.w;wc++) ctx.strokeRect(wx+wc*TILE,wy,TILE,bh);
+    // Arch opening (dark passage through center bottom)
+    const aw=TILE*2, ah=TILE*3;
+    const ax=wx+bw/2-aw/2, ay=wy+bh-ah;
+    ctx.fillStyle=P.navyDark;
+    ctx.fillRect(ax,ay+TILE,aw,ah-TILE);
+    // Arch curve
+    ctx.beginPath();
+    ctx.arc(wx+bw/2,ay+TILE,aw/2,Math.PI,0);
+    ctx.fillStyle=P.navyDark;
+    ctx.fill();
+    // Gold keystone
+    ctx.fillStyle=P.gold;
+    ctx.fillRect(wx+bw/2-3,ay+TILE-8,6,10);
+    ctx.strokeStyle=P.orange;
+    ctx.lineWidth=2;
+    ctx.strokeRect(wx+1,wy+1,bw-2,bh-2);
+
+  } else if(b.type==='stone'){
+    // Old stone house: dark limestone
+    ctx.fillStyle='#a08060';
+    ctx.fillRect(wx,wy,bw,bh);
+    ctx.strokeStyle='rgba(60,30,10,0.4)';
+    ctx.lineWidth=0.5;
+    for(let wr=0;wr<b.h;wr++) ctx.strokeRect(wx,wy+wr*TILE,bw,TILE);
+    for(let wc=0;wc<b.w;wc++) ctx.strokeRect(wx+wc*TILE,wy,TILE,bh);
+    ctx.fillStyle=P.navy;
+    for(let wc=0;wc<b.w;wc++)
+      for(let wr=1;wr<b.h-1;wr++)
+        ctx.fillRect(wx+wc*TILE+4,wy+wr*TILE+3,8,8);
+    ctx.strokeStyle=P.orange;
+    ctx.lineWidth=1;
+    ctx.strokeRect(wx+0.5,wy+0.5,bw-1,bh-1);
+  }
+
+  // Building label on all types
+  ctx.font='bold 7px monospace';
+  ctx.textAlign='center';
+  const tw=ctx.measureText(b.label).width;
+  ctx.fillStyle='rgba(14,24,40,0.8)';
+  ctx.fillRect(wx+bw/2-tw/2-3,wy+bh-13,tw+6,11);
+  ctx.fillStyle=P.gold;
+  ctx.fillText(b.label,wx+bw/2,wy+bh-4);
+}
+
+// Draw a palm tree at tile tx,ty
+function drawPalm(tx,ty){
+  const wx=tx*TILE+TILE/2,wy=ty*TILE;
+  // Trunk
+  ctx.fillStyle='#8a6030';
+  ctx.fillRect(wx-2,wy,4,TILE+4);
+  ctx.fillStyle='#6a4820';
+  ctx.fillRect(wx-1,wy,2,TILE+4);
+  // Fronds
+  const fronds=[[-12,-8],[12,-8],[-8,-14],[8,-14],[0,-16],[-14,-2],[14,-2]];
+  for(const [fx,fy] of fronds){
+    ctx.fillStyle=P.olive;
+    ctx.beginPath();
+    ctx.ellipse(wx+fx/2,wy+fy/2,Math.abs(fx)/2+2,3,Math.atan2(fy,fx),0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle=P.oliveD;
+    ctx.fillRect(wx,wy+fy,fx>0?Math.abs(fx/2):0,2);
+  }
+}
+
+// Draw a lamp post at tile tx,ty
+function drawLamp(tx,ty){
+  const wx=tx*TILE+TILE/2,wy=ty*TILE;
+  ctx.fillStyle='#8888a0';
+  ctx.fillRect(wx-1,wy-4,2,TILE+4);
+  // Lamp head
+  ctx.fillStyle=P.gold;
+  ctx.fillRect(wx-5,wy-8,10,5);
+  ctx.fillStyle='rgba(245,208,96,0.35)';
+  // Glow blob
+  ctx.beginPath();
+  ctx.arc(wx,wy-5,8,0,Math.PI*2);
+  ctx.fill();
+}
+
+// Draw player with 2-frame walk animation
+function drawPlayer(px,py,frame,facing){
+  const x=Math.round(px),y=Math.round(py);
+  const legOff=frame===1?2:0;
+
+  // Shadow
+  ctx.fillStyle='rgba(14,24,40,0.35)';
+  ctx.fillRect(x+3,y+TILE-2,10,3);
+
+  // Body (navy coat, crate-label stamp style)
+  ctx.fillStyle=P.navy;
+  ctx.fillRect(x+3,y+5,10,9);
+  // Coat lapel highlight
+  ctx.fillStyle=P.terracotta;
+  ctx.fillRect(x+3,y+5,4,3);
+
+  // Legs
+  ctx.fillStyle=P.navyDark;
+  if(facing==='left'||facing==='right'){
+    ctx.fillRect(x+4,y+13,3,2+legOff);
+    ctx.fillRect(x+9,y+13,3,2+(legOff?0:2));
+  } else {
+    ctx.fillRect(x+4,y+13,3,3);
+    ctx.fillRect(x+9,y+13,3,3);
+    if(frame===1){ctx.fillRect(x+4,y+16,3,2);} else {ctx.fillRect(x+9,y+16,3,2);}
+  }
+  // Shoes
+  ctx.fillStyle=P.ink;
+  ctx.fillRect(x+3,y+14+legOff,4,2);
+  ctx.fillRect(x+9,y+14+(legOff?0:2),4,2);
+
+  // Head
+  ctx.fillStyle=P.cream;
+  ctx.fillRect(x+4,y+1,8,6);
+  // Hair
+  ctx.fillStyle=P.ink;
+  ctx.fillRect(x+4,y+1,8,2);
+  // Eyes
+  ctx.fillStyle=P.ink;
+  if(facing==='up'){
+    ctx.fillRect(x+5,y+4,2,1);
+    ctx.fillRect(x+9,y+4,2,1);
+  } else {
+    ctx.fillRect(x+5,y+5,2,1);
+    ctx.fillRect(x+9,y+5,2,1);
+  }
+  // White outline
+  ctx.strokeStyle='rgba(245,240,224,0.5)';
+  ctx.lineWidth=0.5;
+  ctx.strokeRect(x+3.25,y+0.75,9.5,14.5);
+}
+
+// Draw NPC (distinct look per character)
+function drawNPC(n,isNear){
+  const wx=n.tx*TILE,wy=n.ty*TILE;
+
+  // Shadow
+  ctx.fillStyle='rgba(14,24,40,0.3)';
+  ctx.fillRect(wx+3,wy+TILE-2,10,3);
+
+  // Body color varies by NPC
+  const colors=[P.terracotta,P.olive,'#8a5a9a',P.waterL,'#9a6020',P.orange];
+  const idx=NPCS.indexOf(n);
+  ctx.fillStyle=colors[idx%colors.length];
+  ctx.fillRect(wx+3,wy+5,10,9);
+
+  // Legs
+  ctx.fillStyle=P.navyDark;
+  ctx.fillRect(wx+4,wy+13,3,3);
+  ctx.fillRect(wx+9,wy+13,3,3);
+
+  // Head
+  ctx.fillStyle=P.cream;
+  ctx.fillRect(wx+4,wy+1,8,6);
+  ctx.fillStyle=P.ink;
+  ctx.fillRect(wx+4,wy+1,8,2);
+  ctx.fillRect(wx+5,wy+5,2,1);
+  ctx.fillRect(wx+9,wy+5,2,1);
+
+  // Highlight ring when near
+  if(isNear){
+    ctx.strokeStyle=P.gold;
+    ctx.lineWidth=1.5;
+    ctx.strokeRect(wx+1.75,wy+0.75,TILE-3.5,TILE-1.5);
+  }
+
+  // Name tag
+  ctx.font='bold 7px monospace';
+  ctx.textAlign='center';
+  const nw=ctx.measureText(n.name).width;
+  ctx.fillStyle='rgba(14,24,40,0.75)';
+  ctx.fillRect(wx+TILE/2-nw/2-2,wy-13,nw+4,11);
+  ctx.fillStyle=isNear?P.gold:P.cream;
+  ctx.fillText(n.name,wx+TILE/2,wy-4);
+
+  // SPACE prompt
+  if(isNear&&!S.dlg){
+    ctx.fillStyle=P.gold;
+    ctx.font='bold 8px monospace';
+    ctx.textAlign='center';
+    ctx.fillText('[SPACE]',wx+TILE/2,wy-20);
+  }
+}
+
+// Draw crate-label dialogue box
+function drawDialogue(){
+  const npc=S.dlg.npc;
+  const text=npc.lines[S.dlg.lineIdx];
+  const BOX_W=490,BOX_H=96,BOX_X=(VW-BOX_W)/2,BOX_Y=VH-BOX_H-14,PAD=14;
+
+  // Outer border (gold double-line, crate label style)
+  ctx.fillStyle='rgba(10,18,36,0.96)';
+  ctx.fillRect(BOX_X,BOX_Y,BOX_W,BOX_H);
+  ctx.strokeStyle=P.orange;
+  ctx.lineWidth=3;
+  ctx.strokeRect(BOX_X+1.5,BOX_Y+1.5,BOX_W-3,BOX_H-3);
+  ctx.strokeStyle=P.gold;
+  ctx.lineWidth=1;
+  ctx.strokeRect(BOX_X+5,BOX_Y+5,BOX_W-10,BOX_H-10);
+
+  // Speaker name tab
+  ctx.font='bold 10px monospace';
+  const nw=ctx.measureText(npc.name).width;
+  ctx.fillStyle=P.orange;
+  ctx.fillRect(BOX_X+PAD-4,BOX_Y-16,nw+14,18);
+  ctx.strokeStyle=P.gold;
+  ctx.lineWidth=1;
+  ctx.strokeRect(BOX_X+PAD-4,BOX_Y-16,nw+14,18);
+  ctx.fillStyle=P.ink;
+  ctx.textAlign='left';
+  ctx.fillText(npc.name,BOX_X+PAD+2,BOX_Y-2);
+
+  // Dialogue text
+  ctx.fillStyle=P.cream;
+  ctx.font='11px monospace';
+  const wrapped=wrapText(ctx,text,BOX_W-PAD*2-8);
+  wrapped.forEach((line,i)=>ctx.fillText(line,BOX_X+PAD+4,BOX_Y+PAD+16+i*17));
+
+  // Continue prompt
+  ctx.fillStyle=P.gold;
+  ctx.font='8px monospace';
+  ctx.textAlign='right';
+  ctx.fillText('[SPACE / TALK]',BOX_X+BOX_W-PAD,BOX_Y+BOX_H-8);
+}
+
+// Draw mini-map (crate-label framed)
+function drawMinimap(){
+  const MX=VW-88,MY=8,MW=80,MH=60;
+  const sx=MW/(COLS*TILE),sy=MH/(ROWS*TILE);
+  // Frame
+  ctx.fillStyle=P.navyDark;
+  ctx.fillRect(MX-2,MY-2,MW+4,MH+4);
+  ctx.strokeStyle=P.orange;
+  ctx.lineWidth=1.5;
+  ctx.strokeRect(MX-1.75,MY-1.75,MW+3.5,MH+3.5);
+  // Terrain bands
+  ctx.fillStyle=P.olive;      ctx.fillRect(MX,MY,MW,MH);
+  ctx.fillStyle=P.sand;       ctx.fillRect(MX,MY+21*TILE*sy,MW,3*TILE*sy);
+  ctx.fillStyle=P.water;      ctx.fillRect(MX,MY+24*TILE*sy,MW,8*TILE*sy);
+  ctx.fillStyle=P.sand;       ctx.fillRect(MX,MY+32*TILE*sy,MW,2*TILE*sy);
+  ctx.fillStyle=P.creamD;     ctx.fillRect(MX,MY+34*TILE*sy,MW,(ROWS-34)*TILE*sy);
+  // Roads
+  ctx.fillStyle=P.roadDark;
+  [2,20,35].forEach(r=>ctx.fillRect(MX,MY+r*TILE*sy,MW,TILE*sy));
+  [1,21,43,65].forEach(c=>ctx.fillRect(MX+c*TILE*sx,MY,TILE*sx,MH));
+  // Buildings
+  ctx.fillStyle=P.terracotta;
+  for(const b of BUILDINGS)
+    ctx.fillRect(MX+b.x*TILE*sx,MY+b.y*TILE*sy,Math.max(2,b.w*TILE*sx),Math.max(2,b.h*TILE*sy));
+  // NPC dots
+  ctx.fillStyle=P.gold;
+  for(const n of NPCS)
+    ctx.fillRect(MX+n.tx*TILE*sx-1,MY+n.ty*TILE*sy-1,2,2);
+  // Player dot
+  ctx.fillStyle=P.orange;
+  ctx.fillRect(MX+S.px*sx-1.5,MY+S.py*sy-1.5,3,3);
+  // Viewport rect
+  ctx.strokeStyle='rgba(245,208,96,0.5)';
+  ctx.lineWidth=0.5;
+  ctx.strokeRect(MX+S.camX*sx,MY+S.camY*sy,VW*sx,VH*sy);
+}
+
+// Zone label (crate-label banner style)
+function drawZoneLabel(){
+  if(S.zoneAlpha<=0||S.dlg)return;
+  ctx.save();
+  ctx.globalAlpha=S.zoneAlpha;
+  ctx.font='bold 13px monospace';
+  ctx.textAlign='center';
+  const tw=ctx.measureText(S.zoneName).width;
+  // Banner
+  ctx.fillStyle=P.terracotta;
+  ctx.fillRect(VW/2-tw/2-18,8,tw+36,24);
+  ctx.strokeStyle=P.gold;
+  ctx.lineWidth=1.5;
+  ctx.strokeRect(VW/2-tw/2-18,8,tw+36,24);
+  ctx.strokeStyle=P.orange;
+  ctx.lineWidth=0.5;
+  ctx.strokeRect(VW/2-tw/2-14,11,tw+28,18);
+  ctx.fillStyle=P.gold;
+  ctx.fillText(S.zoneName,VW/2,25);
+  ctx.restore();
+}
+
+// 8. MAIN DRAW
+function draw(){
+  // Navy sky background
+  ctx.fillStyle=P.navy;
+  ctx.fillRect(0,0,VW,VH);
+
+  ctx.save();
+  ctx.translate(-S.camX,-S.camY);
+
+  const c0=Math.max(0,Math.floor(S.camX/TILE));
+  const c1=Math.min(COLS-1,Math.ceil((S.camX+VW)/TILE));
+  const r0=Math.max(0,Math.floor(S.camY/TILE));
+  const r1=Math.min(ROWS-1,Math.ceil((S.camY+VH)/TILE));
+
+  // Ground tiles
+  for(let r=r0;r<=r1;r++)
+    for(let c=c0;c<=c1;c++)
+      drawTile(S.map[r][c],c*TILE,r*TILE);
+
+  // Lamp posts (behind buildings)
+  for(const p of LAMPS){
+    if(p.x*TILE+TILE<S.camX||p.x*TILE>S.camX+VW) continue;
+    if(p.y*TILE+TILE*2<S.camY||p.y*TILE>S.camY+VH) continue;
+    drawLamp(p.x,p.y);
+  }
+
+  // Palm trees (behind buildings)
+  for(const p of PALMS){
+    if(p.x*TILE+TILE<S.camX||p.x*TILE>S.camX+VW) continue;
+    if(p.y*TILE+TILE*2<S.camY||p.y*TILE>S.camY+VH) continue;
+    drawPalm(p.x,p.y);
+  }
+
+  // Buildings
+  for(const b of BUILDINGS){
+    const wx=b.x*TILE,wy=b.y*TILE,bw=b.w*TILE,bh=b.h*TILE;
+    if(wx+bw<S.camX||wx>S.camX+VW||wy+bh<S.camY||wy>S.camY+VH) continue;
+    drawBuilding(b);
+  }
+
+  // NPCs
+  for(const n of NPCS){
+    const wx=n.tx*TILE,wy=n.ty*TILE;
+    if(wx+TILE<S.camX||wx>S.camX+VW||wy+TILE<S.camY||wy>S.camY+VH) continue;
+    drawNPC(n,n===S.nearNpc);
+  }
+
+  // Player
+  drawPlayer(S.px,S.py,S.walkFrame,S.facing);
+
+  ctx.restore();
+
+  // HUD (screen-space)
+  drawZoneLabel();
+  if(S.dlg) drawDialogue();
+  drawMinimap();
+
+  // Decorative crate-label border on the whole canvas
+  ctx.strokeStyle=P.orange;
+  ctx.lineWidth=3;
+  ctx.strokeRect(1.5,1.5,VW-3,VH-3);
+  ctx.strokeStyle=P.gold;
+  ctx.lineWidth=1;
+  ctx.strokeRect(5,5,VW-10,VH-10);
+}
+
+// 9. INPUT
+window.addEventListener('keydown',e=>{
+  S.keys[e.key]=true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+});
+window.addEventListener('keyup',e=>{delete S.keys[e.key];});
+
+function bindBtn(id,dir){
+  const el=document.getElementById(id);
+  el.addEventListener('pointerdown',e=>{e.preventDefault();S.touch[dir]=true;});
+  el.addEventListener('pointerup',  e=>{e.preventDefault();S.touch[dir]=false;});
+  el.addEventListener('pointercancel',()=>S.touch[dir]=false);
+  el.addEventListener('pointerleave', ()=>S.touch[dir]=false);
+}
+bindBtn('btn-up','up'); bindBtn('btn-down','down');
+bindBtn('btn-left','left'); bindBtn('btn-right','right');
+document.getElementById('btn-talk').addEventListener('pointerdown',e=>{e.preventDefault();tryTalk();});
+
+// 10. GAME LOOP
+let lastTs=0,acc=0;
+function loop(ts){
+  acc+=Math.min(ts-lastTs,100); lastTs=ts;
+  while(acc>=STEP){update(STEP/1000);acc-=STEP;}
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(ts=>{lastTs=ts;requestAnimationFrame(loop);});
+</script>
+</body>
+</html>
