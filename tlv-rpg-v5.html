@@ -17,23 +17,23 @@ html, body {
   aspect-ratio: 3/4;
 }
 canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
-#dpad { position: absolute; bottom: 16px; left: 8px; width: 276px; height: 276px; }
+#dpad { position: absolute; bottom: 16px; left: 8px; width: 226px; height: 226px; }
 .dbtn {
-  position: absolute; width: 112px; height: 112px;
+  position: absolute; width: 90px; height: 90px;
   background: rgba(232,136,10,0.28); border: 4px solid rgba(232,136,10,0.75);
-  border-radius: 50%; color: #e8880a; font-size: 42px;
+  border-radius: 50%; color: #e8880a; font-size: 36px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
-#btn-up    { top: 0;     left: 82px; }
-#btn-down  { top: 164px; left: 82px; }
-#btn-left  { top: 82px;  left: 0;   }
-#btn-right { top: 82px;  left: 164px; }
+#btn-up    { top: 0;     left: 68px; }
+#btn-down  { top: 136px; left: 68px; }
+#btn-left  { top: 68px;  left: 0;   }
+#btn-right { top: 68px;  left: 136px; }
 #btn-talk {
   position: absolute; bottom: 24px; right: 8px;
-  width: 180px; height: 180px;
+  width: 140px; height: 140px;
   background: rgba(232,136,10,0.25); border: 4px solid rgba(245,208,96,0.9);
-  border-radius: 50%; color: #f5d060; font-size: 20px; font-weight: bold;
+  border-radius: 50%; color: #f5d060; font-size: 17px; font-weight: bold;
   font-family: monospace; display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
@@ -167,7 +167,7 @@ const WORLD_ITEMS=[
 ];
 
 // ── BRIDGE COLS ───────────────────────────────────────────────
-const BRIDGE_COLS=[[8,9],[32,33],[56,57]];
+const BRIDGE_COLS=[[1,2],[21,22],[43,44],[64,65]];
 
 // Props
 const PALMS=[
@@ -226,7 +226,9 @@ function buildMap(){
     if(map[19][c]===T_GRASS) map[19][c]=T_PAV;
   }
   for(let r=1;r<ROWS-1;r++)
-    [1,21,43,65].forEach(c=>{if(map[r][c]!==T_WATER)map[r][c]=T_ROAD;});
+    [1,21,43,65].forEach(c=>{
+      if(map[r][c]===T_GRASS||map[r][c]===T_PAV) map[r][c]=T_ROAD;
+    });
   for(const b of BUILDINGS){
     for(let dr=0;dr<b.h;dr++) for(let dc=0;dc<b.w;dc++){
       const row=b.y+dr,col=b.x+dc;
@@ -269,6 +271,8 @@ const S={
   // Time
   gameTime:8*60,   // minutes since midnight, start at 8:00 AM
   day:1,
+  timeSpeed:1,
+  minimapFull:false,
 };
 
 // 4. HELPERS
@@ -416,7 +420,7 @@ function checkNearNpc(){
 // 7. UPDATE
 function update(dt){
   // Time advancement
-  S.gameTime += dt;   // 1 real second = 1 game minute
+  S.gameTime += dt * S.timeSpeed;   // 1 real second = 1 game minute (× timeSpeed)
   if(S.gameTime >= 1440){ S.gameTime -= 1440; S.day++; }
 
   // Fade transition
@@ -856,33 +860,90 @@ function drawDialogue(){
 }
 
 function drawMinimap(){
-  const MX=VW-204,MY=8,MW=196,MH=152;
-  const sx=MW/(COLS*TILE),sy=MH/(ROWS*TILE);
+  const MX=VW-204, MY=8, MW=196, MH=152;
+  // Border/panel
   ctx.fillStyle='#000'; ctx.fillRect(MX-8,MY-8,MW+16,MH+16);
   ctx.strokeStyle='#000'; ctx.lineWidth=6; ctx.strokeRect(MX-3,MY-3,MW+6,MH+6);
   ctx.strokeStyle=P.orange; ctx.lineWidth=3; ctx.strokeRect(MX-2,MY-2,MW+4,MH+4);
   ctx.strokeStyle=P.gold; ctx.lineWidth=1; ctx.strokeRect(MX+1,MY+1,MW-2,MH-2);
-  ctx.fillStyle=P.olive;   ctx.fillRect(MX,MY,MW,MH);
-  ctx.fillStyle=P.sand;    ctx.fillRect(MX,MY+21*TILE*sy,MW,3*TILE*sy);
-  ctx.fillStyle=P.water;   ctx.fillRect(MX,MY+24*TILE*sy,MW,8*TILE*sy);
-  ctx.fillStyle=P.sand;    ctx.fillRect(MX,MY+32*TILE*sy,MW,2*TILE*sy);
-  ctx.fillStyle=P.creamD;  ctx.fillRect(MX,MY+34*TILE*sy,MW,(ROWS-34)*TILE*sy);
-  ctx.fillStyle=P.wood;
-  for(const [ca,cb] of BRIDGE_COLS)
-    ctx.fillRect(MX+ca*TILE*sx,MY+21*TILE*sy,2*TILE*sx,12*TILE*sy);
-  ctx.fillStyle=P.roadDark;
-  [2,20,35].forEach(r=>ctx.fillRect(MX,MY+r*TILE*sy,MW,Math.max(1,TILE*sy)));
-  [1,21,43,65].forEach(c=>ctx.fillRect(MX+c*TILE*sx,MY,Math.max(1,TILE*sx),MH));
-  ctx.fillStyle=P.terracotta;
-  for(const b of BUILDINGS)
-    ctx.fillRect(MX+b.x*TILE*sx,MY+b.y*TILE*sy,Math.max(2,b.w*TILE*sx),Math.max(2,b.h*TILE*sy));
-  ctx.fillStyle=P.gold;
-  for(const n of getActiveNpcs())
-    ctx.fillRect(MX+n.tx*TILE*sx-1,MY+n.ty*TILE*sy-1,2,2);
-  ctx.fillStyle=P.orange;
-  ctx.fillRect(MX+S.px*sx-1.5,MY+S.py*sy-1.5,3,3);
-  ctx.strokeStyle='rgba(245,208,96,0.5)'; ctx.lineWidth=0.5;
-  ctx.strokeRect(MX+S.camX*sx,MY+S.camY*sy,CAM_W*sx,CAM_H*sy);
+
+  if(S.minimapFull){
+    // ── Full world view ──────────────────────────────────────
+    const sx=MW/(COLS*TILE), sy=MH/(ROWS*TILE);
+    ctx.fillStyle=P.olive;   ctx.fillRect(MX,MY,MW,MH);
+    ctx.fillStyle=P.sand;    ctx.fillRect(MX,MY+21*TILE*sy,MW,3*TILE*sy);
+    ctx.fillStyle=P.water;   ctx.fillRect(MX,MY+24*TILE*sy,MW,8*TILE*sy);
+    ctx.fillStyle=P.sand;    ctx.fillRect(MX,MY+32*TILE*sy,MW,2*TILE*sy);
+    ctx.fillStyle=P.creamD;  ctx.fillRect(MX,MY+34*TILE*sy,MW,(ROWS-34)*TILE*sy);
+    // Bridges
+    ctx.fillStyle=P.wood;
+    for(const [ca] of BRIDGE_COLS)
+      ctx.fillRect(MX+ca*TILE*sx,MY+21*TILE*sy,2*TILE*sx,12*TILE*sy);
+    // Roads — only above (rows 1-20) and below (rows 34+) the water strip
+    ctx.fillStyle=P.roadDark;
+    [2,20,35].forEach(r=>ctx.fillRect(MX,MY+r*TILE*sy,MW,Math.max(1,TILE*sy)));
+    [1,21,43,65].forEach(c=>{
+      ctx.fillRect(MX+c*TILE*sx, MY,                   Math.max(1,TILE*sx), 20*TILE*sy);
+      ctx.fillRect(MX+c*TILE*sx, MY+34*TILE*sy,        Math.max(1,TILE*sx), (ROWS-34)*TILE*sy);
+    });
+    // Buildings
+    ctx.fillStyle=P.terracotta;
+    for(const b of BUILDINGS)
+      ctx.fillRect(MX+b.x*TILE*sx,MY+b.y*TILE*sy,Math.max(2,b.w*TILE*sx),Math.max(2,b.h*TILE*sy));
+    // NPCs
+    ctx.fillStyle=P.gold;
+    for(const n of getActiveNpcs())
+      ctx.fillRect(MX+n.tx*TILE*sx-1,MY+n.ty*TILE*sy-1,2,2);
+    // Player dot
+    ctx.fillStyle=P.orange;
+    ctx.fillRect(MX+S.px*sx-1.5,MY+S.py*sy-1.5,3,3);
+    // Viewport box
+    ctx.strokeStyle='rgba(245,208,96,0.5)'; ctx.lineWidth=0.5;
+    ctx.strokeRect(MX+S.camX*sx,MY+S.camY*sy,CAM_W*sx,CAM_H*sy);
+    // Label
+    ctx.font='bold 9px monospace'; ctx.textAlign='center'; ctx.fillStyle=P.gold;
+    ctx.fillText('TAP TO ZOOM IN',MX+MW/2,MY+MH-4);
+  } else {
+    // ── Zoomed local view (28×22 tiles around player) ────────
+    const ZW=28, ZH=22;
+    const tsx=MW/ZW, tsy=MH/ZH;
+    const ptx=Math.floor(S.px/TILE), pty=Math.floor(S.py/TILE);
+    let sc=Math.round(ptx-ZW/2), sr=Math.round(pty-ZH/2);
+    sc=Math.max(0,Math.min(sc,COLS-ZW));
+    sr=Math.max(0,Math.min(sr,ROWS-ZH));
+    // Draw tiles
+    const MINI_COLOR=[P.olive,P.roadDark,P.creamD,P.sand,P.water,P.terracotta,P.navyDark,P.wood,'#8b6340'];
+    for(let r=0;r<ZH;r++) for(let c=0;c<ZW;c++){
+      const wr=sr+r, wc=sc+c;
+      if(wr<0||wr>=ROWS||wc<0||wc>=COLS) continue;
+      ctx.fillStyle=MINI_COLOR[S.map[wr][wc]]||P.olive;
+      ctx.fillRect(MX+c*tsx, MY+r*tsy, Math.ceil(tsx), Math.ceil(tsy));
+    }
+    // Buildings
+    ctx.fillStyle=P.terracotta;
+    for(const b of BUILDINGS){
+      const bx=b.x-sc, by=b.y-sr;
+      if(bx+b.w<0||bx>ZW||by+b.h<0||by>ZH) continue;
+      ctx.fillRect(MX+bx*tsx, MY+by*tsy, b.w*tsx, b.h*tsy);
+    }
+    // NPCs
+    for(const n of getActiveNpcs()){
+      const nx=n.tx-sc, ny=n.ty-sr;
+      if(nx<0||nx>=ZW||ny<0||ny>=ZH) continue;
+      ctx.fillStyle=NPC_COLORS[n.name]||P.gold;
+      ctx.fillRect(MX+(nx+0.5)*tsx-2, MY+(ny+0.5)*tsy-2, 4, 4);
+    }
+    // Player dot — always centered
+    ctx.fillStyle=P.orange;
+    ctx.beginPath();
+    ctx.arc(MX+MW/2, MY+MH/2, 4, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.arc(MX+MW/2, MY+MH/2, 4, 0, Math.PI*2); ctx.stroke();
+    // Label
+    ctx.font='bold 9px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(245,208,96,0.7)';
+    ctx.fillText('TAP FOR WORLD MAP',MX+MW/2,MY+MH-4);
+  }
 }
 
 function drawZoneLabel(){
@@ -906,23 +967,59 @@ function drawRoomName(){
   ctx.fillStyle=P.gold; ctx.fillText(name,VW/2,24);
 }
 
+// FF button hit areas (in canvas coords) — filled during drawTimeHUD
+const FF_BTNS=[];
+
 function drawTimeHUD(){
+  // Positioned below the minimap
+  const TX=VW-204, TY=168, TW=196, TH=50;
   const h=Math.floor(S.gameTime/60)%24;
   const m=Math.floor(S.gameTime%60);
   const ampm=h>=12?'PM':'AM';
   const h12=h%12||12;
   const timeStr=`${h12}:${String(m).padStart(2,'0')} ${ampm}`;
   const dayStr=`Day ${S.day}`;
-  ctx.fillStyle='rgba(10,18,36,0.82)';
-  ctx.fillRect(8,8,116,40);
+
+  // Panel
+  ctx.fillStyle='rgba(10,18,36,0.88)';
+  ctx.fillRect(TX,TY,TW,TH);
   ctx.strokeStyle=P.orange; ctx.lineWidth=1.5;
-  ctx.strokeRect(8,8,116,40);
+  ctx.strokeRect(TX,TY,TW,TH);
   ctx.strokeStyle=P.gold; ctx.lineWidth=0.5;
-  ctx.strokeRect(11,11,110,34);
-  ctx.font='bold 15px monospace'; ctx.textAlign='left'; ctx.fillStyle=P.gold;
-  ctx.fillText(timeStr,15,27);
+  ctx.strokeRect(TX+3,TY+3,TW-6,TH-6);
+
+  // Time and day
+  ctx.font='bold 16px monospace'; ctx.textAlign='left'; ctx.fillStyle=P.gold;
+  ctx.fillText(timeStr, TX+8, TY+18);
   ctx.font='11px monospace'; ctx.fillStyle=P.creamD;
-  ctx.fillText(dayStr,15,41);
+  ctx.fillText(dayStr, TX+8, TY+33);
+
+  // FF buttons: ×1, ×5, ×10
+  FF_BTNS.length=0;
+  const speeds=[1,5,10];
+  const labels=['×1','×5','×10'];
+  const btnW=36, btnH=22, btnY=TY+TH-28;
+  const btnStartX=TX+TW-speeds.length*(btnW+4)-4;
+  speeds.forEach((spd,i)=>{
+    const bx=btnStartX+i*(btnW+4);
+    const active=S.timeSpeed===spd;
+    ctx.fillStyle=active?P.orange:'rgba(245,208,96,0.15)';
+    ctx.fillRect(bx,btnY,btnW,btnH);
+    ctx.strokeStyle=active?P.gold:P.orange; ctx.lineWidth=1;
+    ctx.strokeRect(bx+0.5,btnY+0.5,btnW-1,btnH-1);
+    ctx.font=`bold 11px monospace`; ctx.textAlign='center';
+    ctx.fillStyle=active?P.ink:P.gold;
+    ctx.fillText(labels[i], bx+btnW/2, btnY+btnH-6);
+    FF_BTNS.push({x:bx,y:btnY,w:btnW,h:btnH,speed:spd});
+  });
+}
+
+function handleFFClick(cx,cy){
+  for(const b of FF_BTNS){
+    if(cx>=b.x&&cx<=b.x+b.w&&cy>=b.y&&cy<=b.y+b.h){
+      S.timeSpeed=b.speed; return;
+    }
+  }
 }
 
 // 9. MAIN DRAW
@@ -1003,6 +1100,7 @@ function draw(){
   drawTimeHUD();
   if(S.dlg) drawDialogue();
   if(!S.indoor) drawMinimap();
+
   drawInventory();
   drawPickupBanner();
 
@@ -1034,6 +1132,20 @@ function bindBtn(id,dir){
 bindBtn('btn-up','up'); bindBtn('btn-down','down');
 bindBtn('btn-left','left'); bindBtn('btn-right','right');
 document.getElementById('btn-talk').addEventListener('pointerdown',e=>{e.preventDefault();tryTalk();});
+
+// Minimap click → toggle zoom
+canvas.addEventListener('pointerdown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) * (VW / rect.width);
+  const cy = (e.clientY - rect.top)  * (VH / rect.height);
+  const MX=VW-204, MY=8, MW=196, MH=152;
+  if(!S.indoor && cx>=MX-8 && cx<=MX+MW+8 && cy>=MY-8 && cy<=MY+MH+8){
+    S.minimapFull = !S.minimapFull;
+    e.stopPropagation();
+  }
+  // FF buttons — handled separately below
+  handleFFClick(cx, cy);
+});
 
 // 11. GAME LOOP
 let lastTs=0,acc=0;
