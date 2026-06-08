@@ -18,7 +18,7 @@ It generates JS constant blocks that a developer pastes into the game.
 
 ## Repository
 
-`hani-azzam/claude_experiments` — branch `claude/magical-heisenberg-vnYbO`
+`hani-azzam/claude_experiments` — branch `main`
 
 The current production game is `tlv-rpg-v5.html`.
 All game constants the tool must be compatible with are documented in this file.
