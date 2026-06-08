@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>TLV Game Designer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a2e;color:#eee;font-family:monospace;font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#header{background:#16213e;border-bottom:1px solid #0f3460;padding:8px 16px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+#header h1{font-size:14px;color:#f5d060;margin-right:auto;letter-spacing:1px}
+.btn{background:#0f3460;color:#eee;border:1px solid #2a4a80;padding:5px 11px;cursor:pointer;font-family:monospace;font-size:12px;border-radius:2px;white-space:nowrap}
+.btn:hover{background:#1a5090}
+.btn-accent{background:#e94560;border-color:#e94560}
+.btn-accent:hover{background:#ff6070}
+.btn-sm{padding:3px 7px;font-size:11px}
+#main{display:flex;flex:1;overflow:hidden}
+#panel{width:290px;background:#16213e;border-right:2px solid #0f3460;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+#tabs{display:flex;border-bottom:1px solid #0f3460;flex-shrink:0}
+.tab{padding:7px 10px;cursor:pointer;color:#888;border-bottom:2px solid transparent;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.tab.active{color:#f5d060;border-bottom-color:#f5d060}
+.tab:hover{color:#eee}
+#panel-content{flex:1;overflow-y:auto;padding:10px}
+#canvas-area{flex:1;overflow:auto;background:#111;position:relative}
+#zoom-bar{position:sticky;top:0;left:0;z-index:10;background:rgba(22,33,62,0.95);padding:4px 8px;display:flex;gap:6px;align-items:center;border-bottom:1px solid #0f3460}
+#mode-badge{background:#e94560;color:#fff;padding:2px 8px;font-size:11px;border-radius:2px;display:none}
+canvas{display:block;cursor:crosshair}
+#coord-hud{position:fixed;bottom:28px;right:8px;background:rgba(15,52,96,0.92);padding:4px 8px;font-size:11px;border:1px solid #0f3460;pointer-events:none;z-index:20}
+#status-bar{background:#0f1d35;border-top:1px solid #0f3460;padding:3px 12px;font-size:11px;color:#888;flex-shrink:0;height:22px}
+.field{margin-bottom:7px}
+.field label{display:block;color:#aaa;font-size:11px;margin-bottom:2px}
+.field input,.field select,.field textarea{width:100%;background:#0d1a30;border:1px solid #1a3a60;color:#eee;padding:4px 6px;font-family:monospace;font-size:12px;border-radius:1px}
+.field textarea{height:44px;resize:vertical}
+.field input[type=color]{height:26px;padding:1px 2px;width:100%}
+.field input[type=number]{width:64px}
+.field input[type=checkbox]{width:auto;margin-right:5px}
+.ifields{display:flex;gap:5px}
+.ifields .field{flex:1;min-width:0}
+.sec{color:#f5d060;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin:10px 0 5px;border-bottom:1px solid #0f3460;padding-bottom:2px}
+.elist{list-style:none}
+.elist li{padding:5px 7px;cursor:pointer;border-radius:2px;display:flex;justify-content:space-between;align-items:center;font-size:12px}
+.elist li:hover{background:#0f3460}
+.elist li.sel{background:#c03050}
+.elist li .x{color:#e94560;cursor:pointer;font-size:13px;flex-shrink:0;margin-left:5px;line-height:1}
+.elist li.sel .x{color:#ffaaaa}
+.sitem{background:#0d1a30;border:1px solid #1a3a60;margin-bottom:6px;padding:7px;position:relative;border-radius:1px}
+.sitem .rx{position:absolute;right:6px;top:5px;color:#e94560;cursor:pointer;font-size:13px;line-height:1}
+.tip{color:#666;font-size:11px;font-style:italic;margin-bottom:6px;line-height:1.5}
+hr{border:none;border-top:1px solid #0f3460;margin:8px 0}
+.legend-row{display:flex;align-items:center;gap:7px;margin-bottom:3px;font-size:11px}
+.swatch{width:16px;height:16px;border:1px solid #333;flex-shrink:0}
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:100;align-items:center;justify-content:center}
+#modal-overlay.open{display:flex}
+#modal{background:#16213e;border:2px solid #0f3460;width:720px;max-height:82vh;display:flex;flex-direction:column;border-radius:2px}
+#modal-hdr{padding:10px 16px;border-bottom:1px solid #0f3460;display:flex;justify-content:space-between;align-items:center;color:#f5d060;font-size:14px}
+#modal-body{flex:1;overflow-y:auto;padding:14px}
+#modal-body pre{background:#0d1a30;border:1px solid #1a3a60;padding:10px;font-size:11px;overflow-x:auto;white-space:pre-wrap;color:#a8e0a8;line-height:1.5;max-height:60vh;overflow-y:auto}
+#modal-ftr{padding:8px 14px;border-top:1px solid #0f3460;display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>⬛ TLV GAME DESIGNER — Phase 1</h1>
+  <button class="btn" onclick="saveToStorage()">💾 Save</button>
+  <button class="btn" onclick="loadFromStorage()">📂 Load</button>
+  <button class="btn" onclick="doExportJSON()">↓ JSON</button>
+  <label class="btn" style="cursor:pointer">↑ JSON<input type="file" accept=".json" onchange="doImportJSON(event)" style="display:none"></label>
+  <button class="btn btn-accent" onclick="showExportModal()">Export JS</button>
+</div>
+
+<div id="main">
+  <div id="panel">
+    <div id="tabs">
+      <div class="tab active" data-tab="map"       onclick="switchTab('map')">Map</div>
+      <div class="tab"        data-tab="buildings" onclick="switchTab('buildings')">Bldgs</div>
+      <div class="tab"        data-tab="npcs"      onclick="switchTab('npcs')">NPCs</div>
+      <div class="tab"        data-tab="items"     onclick="switchTab('items')">Items</div>
+      <div class="tab"        data-tab="zones"     onclick="switchTab('zones')">Zones</div>
+      <div class="tab"        data-tab="props"     onclick="switchTab('props')">Props</div>
+    </div>
+    <div id="panel-content"></div>
+  </div>
+
+  <div id="canvas-area">
+    <div id="zoom-bar">
+      <span style="color:#888;font-size:11px">Zoom:</span>
+      <button class="btn btn-sm" onclick="setZoom(0.5)">50%</button>
+      <button class="btn btn-sm" onclick="setZoom(1.0)">100%</button>
+      <button class="btn btn-sm" onclick="setZoom(1.5)">150%</button>
+      <span id="zoom-lbl" style="color:#f5d060;font-size:11px;min-width:35px">100%</span>
+      <span id="mode-badge"></span>
+      <span style="color:#444;margin-left:8px;font-size:10px">Right-click=delete selected · Del key · Esc=cancel</span>
+    </div>
+    <canvas id="map-canvas"></canvas>
+  </div>
+</div>
+
+<div id="status-bar">Ready — auto-saved to localStorage</div>
+<div id="coord-hud">Tile: (—, —)</div>
+
+<div id="modal-overlay">
+  <div id="modal">
+    <div id="modal-hdr">
+      <span>Export JS Constants</span>
+      <button class="btn btn-sm" onclick="closeModal()">✕ Close</button>
+    </div>
+    <div id="modal-body">
+      <p style="margin-bottom:8px;color:#aaa;font-size:12px">Paste this block into <code style="color:#f5d060">tlv-rpg-v5.html</code> replacing the matching constants (BUILDINGS through LAMPS).</p>
+      <pre id="export-out"></pre>
+    </div>
+    <div id="modal-ftr">
+      <button class="btn btn-accent" onclick="copyExport()">📋 Copy to Clipboard</button>
+      <button class="btn" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const COLS=80, ROWS=60, BASE_TILE=16;
+const T={GRASS:0,ROAD:1,PAV:2,SAND:3,WATER:4,BLDG:5,WALL:6,BRIDGE:7,DOOR:8};
+const TCOL={0:'#526e20',1:'#484848',2:'#c0ad70',3:'#c09848',4:'#2e6e9e',5:'#7a6858',6:'#282828',7:'#7a5e2e',8:'#f5d060'};
+const BTYPE_COL={
+  bauhaus:{wall:'#e0ceaa',roof:'#c07248',win:'#2e4e90'},
+  cafe:   {wall:'#e0ceaa',roof:'#d06828',win:'#4a8820'},
+  market: {wall:'#ba6838',roof:'#b83828',win:'#f5d060'},
+  arch:   {wall:'#c0a068',roof:'#5a3818',win:'#7a5838'},
+  stone:  {wall:'#807060',roof:'#604838',win:'#503828'},
+};
+const ZPALS=['rgba(255,90,90,.22)','rgba(80,200,80,.22)','rgba(80,160,255,.22)','rgba(255,210,60,.22)','rgba(180,80,255,.22)','rgba(60,220,180,.22)'];
+
+// ── DEFAULT DATA (seeded from tlv-rpg-v5.html) ────────────────────────────
+const DEFAULTS={
+  buildings:[
+    {x:5, y:4, w:5,h:7,label:'Apt. Block',   type:'bauhaus',door:{dc:2,dr:6}},
+    {x:12,y:4, w:5,h:7,label:'Apt. Block',   type:'bauhaus',door:{dc:2,dr:6}},
+    {x:24,y:4, w:6,h:7,label:'Shuk HaCarmel',type:'market', door:{dc:3,dr:6},interior:'shuk'},
+    {x:33,y:4, w:5,h:7,label:'Cafe Yasmin',  type:'cafe',   door:{dc:2,dr:6},interior:'cafe'},
+    {x:46,y:4, w:5,h:7,label:'Apt. Block',   type:'bauhaus',door:{dc:2,dr:6}},
+    {x:54,y:4, w:5,h:7,label:'Apt. Block',   type:'bauhaus',door:{dc:2,dr:6}},
+    {x:5, y:37,w:7,h:9,label:'Jaffa Arch',   type:'arch',   door:{dc:3,dr:8}},
+    {x:18,y:38,w:5,h:8,label:'Old House',    type:'stone',  door:{dc:2,dr:7},interior:'oldhouse'},
+    {x:42,y:37,w:6,h:8,label:'Port Cafe',    type:'cafe',   door:{dc:3,dr:7},interior:'portcafe'},
+  ],
+  interiors:{
+    cafe:{name:'Cafe Yasmin',roomW:14,roomH:10,bgColor:'#d4a860',floorColor:'#c89050',wallColor:'#e8c880',
+      furniture:[{type:'counter',x:1,y:1,w:12,h:2,color:'#8b5a2a'},{type:'table',x:2,y:5,w:3,h:2,color:'#a07040'},{type:'table',x:7,y:5,w:3,h:2,color:'#a07040'},{type:'table',x:2,y:7,w:3,h:2,color:'#a07040'},{type:'table',x:7,y:7,w:3,h:2,color:'#a07040'}],
+      items:[{x:5,y:3,id:'coffee',label:'Cup of Coffee',color:'#4a2800',desc:'Strong and dark. Very Tel Aviv.'}],
+      npcs:[{tx:1,ty:3,name:'Barista',lines:["What can I get you?","The bourekas are fresh this morning.","Sit anywhere you like."]}],
+      exitTile:{x:7,y:9}},
+    shuk:{name:'Shuk HaCarmel',roomW:16,roomH:11,bgColor:'#c88840',floorColor:'#b87030',wallColor:'#d4a060',
+      furniture:[{type:'stall',x:1,y:1,w:4,h:3,color:'#8b4a20',label:'Spices'},{type:'stall',x:7,y:1,w:4,h:3,color:'#6a3a18',label:'Halva'},{type:'stall',x:12,y:1,w:3,h:3,color:'#7a4420',label:'Falafel'},{type:'stall',x:1,y:6,w:4,h:3,color:'#5a3010',label:'Fruit'},{type:'stall',x:7,y:6,w:4,h:3,color:'#8b4a20',label:'Cheese'},{type:'stall',x:12,y:6,w:3,h:3,color:'#6a3a18',label:'Bread'}],
+      items:[{x:9,y:5,id:'halva',label:'Piece of Halva',color:'#d4a860',desc:"Sesame and honey. Shira insists."}],
+      npcs:[{tx:1,ty:5,name:'Shira',lines:["Welcome to the Shuk! Try the halva, trust me.","I've been selling spices here for twenty years.","Come back on Friday — the whole city turns up."]}],
+      exitTile:{x:8,y:10}},
+    oldhouse:{name:'Old Jaffa House',roomW:12,roomH:9,bgColor:'#b89060',floorColor:'#a07848',wallColor:'#c8a878',
+      furniture:[{type:'counter',x:1,y:1,w:10,h:1,color:'#7a5830'},{type:'table',x:2,y:4,w:4,h:3,color:'#8a6040'},{type:'table',x:7,y:4,w:3,h:3,color:'#8a6040'}],
+      items:[{x:6,y:3,id:'seaglass',label:'Sea Glass',color:'#70c8b0',desc:'Smooth green glass from the port. A gift from the sea.'}],
+      npcs:[{tx:1,ty:3,name:'Ibrahim',lines:["Jaffa is three thousand years old. Tel Aviv is one hundred.","This house was built in the Ottoman period.","The sea glass on the shelf — take it, if you like."]}],
+      exitTile:{x:6,y:8}},
+    portcafe:{name:'Port Cafe',roomW:13,roomH:9,bgColor:'#c89060',floorColor:'#b07848',wallColor:'#d4a870',
+      furniture:[{type:'counter',x:1,y:1,w:11,h:2,color:'#6a4828'},{type:'table',x:2,y:5,w:3,h:2,color:'#8a6040'},{type:'table',x:6,y:5,w:3,h:2,color:'#8a6040'},{type:'table',x:10,y:5,w:2,h:2,color:'#8a6040'}],
+      items:[{x:4,y:4,id:'postcard',label:'Jaffa Postcard',color:'#f5d060',desc:'A faded postcard of old Jaffa. Someone wrote "wish you were here" in Hebrew.'}],
+      npcs:[{tx:1,ty:3,name:'Yael',lines:["The best coffee in Jaffa. No argument.","People think Tel Aviv and Jaffa are separate. We're the same city.","Stay for sunset. The light on the water — you'll understand everything."]}],
+      exitTile:{x:7,y:8}},
+  },
+  npcs:[
+    {name:'Moshe',schedule:[
+      {start:6, end:12,tx:10,ty:12,lines:["Good morning! Coffee before anything else.","The city is calm at this hour. Enjoy it.","Early risers get the best falafel."]},
+      {start:12,end:18,tx:10,ty:8, lines:["Shalom! First time in Tel Aviv?","The falafel on Ibn Gabirol — don't miss it.","Everyone here is from somewhere else. That's the whole point."]},
+      {start:18,end:22,tx:14,ty:22,lines:["Beautiful evening. The sea air is perfect.","I come here every evening to clear my head.","At this hour the whole city unwinds."]},
+    ]},
+    {name:'David',schedule:[
+      {start:7, end:12,tx:50,ty:8, lines:["Morning on Rothschild. My favorite hour.","The buildings look best in the morning light.","I cycle this boulevard every morning. Rain or shine."]},
+      {start:12,end:18,tx:50,ty:12,lines:["Rothschild is beautiful, yes? The Bauhaus buildings.","This boulevard was designed for people, not cars. Rare.","I do my best thinking on this bench. Don't tell my boss."]},
+      {start:18,end:22,tx:46,ty:16,lines:["Evening drinks on Rothschild — the classic TLV ritual.","Look how the café lights come on. Like a chain reaction.","Friday evenings here are something else entirely."]},
+    ]},
+    {name:'Noa',schedule:[
+      {start:7, end:11,tx:30,ty:22,lines:["Early swim. Best time — beach is almost empty.","The Mediterranean is warmest in October.","I swim here every morning. Even in January."]},
+      {start:15,end:20,tx:25,ty:22,lines:["Afternoon on the beach — this is what Tel Aviv is for.","Watch out for jellyfish season — August is rough.","The sunset from here is different every single evening."]},
+      {start:20,end:22,tx:35,ty:22,lines:["Last light on the water. I never get tired of this.","The sea at night makes a different sound.","Stay a little longer. You'll understand why people move here."]},
+    ]},
+  ],
+  zones:[
+    {name:'Dizengoff Square',x1:4, y1:2, x2:20,y2:19},
+    {name:'Shuk HaCarmel',   x1:22,y1:2, x2:41,y2:19},
+    {name:'Rothschild Blvd', x1:44,y1:2, x2:63,y2:19},
+    {name:'Tel Aviv Beach',  x1:2, y1:21,x2:77,y2:27},
+    {name:'Old Jaffa',       x1:2, y1:35,x2:35,y2:57},
+    {name:'Jaffa Port',      x1:38,y1:35,x2:77,y2:57},
+  ],
+  items:[
+    {tx:30,ty:23,id:'shell',label:'Sea Shell',color:'#f0c8a0',desc:'A small spiral shell from the Mediterranean shore.'},
+  ],
+  palms:[{x:3,y:5},{x:20,y:5},{x:22,y:12},{x:42,y:5},{x:64,y:5},{x:5,y:22},{x:18,y:22},{x:35,y:22},{x:52,y:22},{x:68,y:22},{x:3,y:38},{x:36,y:38},{x:66,y:38}],
+  lamps:[{x:7,y:3},{x:7,y:18},{x:23,y:3},{x:23,y:18},{x:44,y:3},{x:44,y:18},{x:65,y:3},{x:65,y:18},{x:7,y:36},{x:36,y:36},{x:65,y:36}],
+};
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let D={
+  buildings:[],interiors:{},npcs:[],zones:[],items:[],palms:[],lamps:[],
+  activeTab:'buildings',
+  selected:null,
+  mode:'select',
+  zoom:1.0,
+  dragStart:null,dragCur:null,
+  pickingSlot:null,
+};
+
+// ── BASE MAP ───────────────────────────────────────────────────────────────
+let baseMap=[];
+function buildBaseMap(){
+  const VCOLS=[1,21,43,65];
+  const BCOLS=[1,2,21,22,43,44,64,65];
+  baseMap=[];
+  for(let r=0;r<ROWS;r++){
+    baseMap[r]=[];
+    for(let c=0;c<COLS;c++){
+      let t;
+      if(r===0||r===ROWS-1) t=T.WALL;
+      else if(r>=24&&r<=31) t=T.WATER;
+      else if((r>=21&&r<=23)||(r>=32&&r<=33)) t=T.SAND;
+      else if(r>=34) t=T.PAV;
+      else t=T.GRASS;
+      if(r===2||r===20||r===35) t=T.ROAD;
+      if(VCOLS.includes(c)&&!(r>=21&&r<=33)) t=T.ROAD;
+      if(BCOLS.includes(c)&&r>=21&&r<=33) t=T.BRIDGE;
+      baseMap[r][c]=t;
+    }
+  }
+}
+
+// ── CANVAS ─────────────────────────────────────────────────────────────────
+const cvs=document.getElementById('map-canvas');
+const ctx=cvs.getContext('2d');
+function ts(){return Math.round(BASE_TILE*D.zoom)}
+function resizeCanvas(){cvs.width=COLS*ts();cvs.height=ROWS*ts()}
+
+function draw(){
+  const s=ts();
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){ctx.fillStyle=TCOL[baseMap[r][c]];ctx.fillRect(c*s,r*s,s,s)}
+  if(D.zoom>=0.75){
+    ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=.5;
+    for(let c=0;c<=COLS;c++){ctx.beginPath();ctx.moveTo(c*s,0);ctx.lineTo(c*s,ROWS*s);ctx.stroke()}
+    for(let r=0;r<=ROWS;r++){ctx.beginPath();ctx.moveTo(0,r*s);ctx.lineTo(COLS*s,r*s);ctx.stroke()}
+  }
+  D.zones.forEach((z,i)=>{
+    ctx.fillStyle=ZPALS[i%ZPALS.length];
+    ctx.fillRect(z.x1*s,z.y1*s,(z.x2-z.x1+1)*s,(z.y2-z.y1+1)*s);
+    const sel=D.selected&&D.selected.type==='zone'&&D.selected.index===i;
+    if(sel){ctx.strokeStyle='rgba(245,208,96,.9)';ctx.lineWidth=2;ctx.strokeRect(z.x1*s+1,z.y1*s+1,(z.x2-z.x1+1)*s-2,(z.y2-z.y1+1)*s-2)}
+    if(D.zoom>=0.6){
+      ctx.font=`bold ${Math.max(9,s*.65)}px monospace`;
+      ctx.fillStyle='rgba(255,255,255,0.75)';
+      ctx.fillText(z.name,z.x1*s+3,z.y1*s+s);
+    }
+  });
+  if(D.mode==='draw_zone'&&D.dragStart&&D.dragCur){
+    const x1=Math.min(D.dragStart.tx,D.dragCur.tx),y1=Math.min(D.dragStart.ty,D.dragCur.ty);
+    const x2=Math.max(D.dragStart.tx,D.dragCur.tx),y2=Math.max(D.dragStart.ty,D.dragCur.ty);
+    ctx.fillStyle='rgba(245,208,96,.18)';ctx.fillRect(x1*s,y1*s,(x2-x1+1)*s,(y2-y1+1)*s);
+    ctx.strokeStyle='#f5d060';ctx.lineWidth=1.5;ctx.strokeRect(x1*s,y1*s,(x2-x1+1)*s,(y2-y1+1)*s);
+  }
+  D.buildings.forEach((b,i)=>drawBuilding(b,D.selected&&D.selected.type==='building'&&D.selected.index===i,s));
+  if(D.mode==='place_building'&&D.dragStart&&D.dragCur){
+    const x=Math.min(D.dragStart.tx,D.dragCur.tx),y=Math.min(D.dragStart.ty,D.dragCur.ty);
+    const w=Math.abs(D.dragCur.tx-D.dragStart.tx)+1,h=Math.abs(D.dragCur.ty-D.dragStart.ty)+1;
+    ctx.fillStyle='rgba(200,180,140,.45)';ctx.fillRect(x*s,y*s,w*s,h*s);
+    ctx.strokeStyle='#f5d060';ctx.lineWidth=1.5;ctx.strokeRect(x*s,y*s,w*s,h*s);
+    ctx.fillStyle='#f5d060';ctx.font=`${Math.max(8,s*.6)}px monospace`;ctx.fillText(`${w}x${h}`,x*s+2,y*s+s);
+  }
+  D.palms.forEach(p=>{
+    const cx=(p.x+.5)*s,cy=(p.y+.5)*s,r=s*.38;
+    ctx.fillStyle='#1e5018';ctx.beginPath();ctx.arc(cx,cy+r*.2,r*.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#2e7a20';ctx.beginPath();ctx.arc(cx,cy-r*.1,r*.75,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#3a9828';ctx.beginPath();ctx.arc(cx,cy-r*.4,r*.55,0,Math.PI*2);ctx.fill();
+  });
+  D.lamps.forEach(l=>{
+    const cx=(l.x+.5)*s,cy=(l.y+.5)*s,h=s*.75;
+    ctx.fillStyle='#a09070';ctx.fillRect(cx-1,cy-h*.5,2,h);
+    ctx.fillStyle='#ffe888';ctx.beginPath();ctx.arc(cx,cy-h*.5,s*.2,0,Math.PI*2);ctx.fill();
+    if(D.zoom>=.75){ctx.fillStyle='rgba(255,240,160,.15)';ctx.beginPath();ctx.arc(cx,cy-h*.5,s*.8,0,Math.PI*2);ctx.fill()}
+  });
+  D.npcs.forEach((npc,i)=>{
+    if(!npc.schedule||!npc.schedule.length)return;
+    npc.schedule.forEach((slot,si)=>{
+      const primary=si===0;
+      const sel=D.selected&&D.selected.type==='npc'&&D.selected.index===i;
+      const cx=(slot.tx+.5)*s,cy=(slot.ty+.5)*s;
+      ctx.fillStyle=sel&&primary?'#e94560':primary?'#ff7733':'rgba(255,120,60,.4)';
+      ctx.beginPath();ctx.arc(cx,cy,s*(primary?.42:.28),0,Math.PI*2);ctx.fill();
+      if(primary){
+        ctx.strokeStyle=sel?'#f5d060':'rgba(255,255,255,.6)';ctx.lineWidth=sel?2:1;ctx.stroke();
+        if(D.zoom>=.75){
+          ctx.fillStyle='#fff';ctx.font=`bold ${Math.max(8,s*.5)}px monospace`;
+          ctx.textAlign='center';ctx.fillText(npc.name[0],cx,cy+s*.18);ctx.textAlign='left';
+        }
+      }
+    });
+  });
+  D.items.forEach((it,i)=>{
+    const cx=(it.tx+.5)*s,cy=(it.ty+.5)*s;
+    const sel=D.selected&&D.selected.type==='item'&&D.selected.index===i;
+    ctx.fillStyle=it.color||'#f0c8a0';
+    ctx.beginPath();ctx.arc(cx,cy,s*.33,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle=sel?'#f5d060':'rgba(255,255,255,.5)';ctx.lineWidth=sel?2:1;ctx.stroke();
+    if(D.zoom>=1&&it.label){
+      ctx.fillStyle='rgba(255,255,255,.7)';ctx.font=`${Math.max(7,s*.45)}px monospace`;
+      ctx.fillText(it.label,(it.tx+.5)*s+s*.4,(it.ty+.5)*s+s*.15);
+    }
+  });
+  if(D.mode==='pick_npc_pos'&&D.dragCur){
+    ctx.strokeStyle='#f5d060';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc((D.dragCur.tx+.5)*s,(D.dragCur.ty+.5)*s,s*.55,0,Math.PI*2);ctx.stroke();
+  }
+}
+
+function drawBuilding(b,sel,s){
+  const c=BTYPE_COL[b.type]||BTYPE_COL.bauhaus;
+  ctx.fillStyle=c.wall;ctx.fillRect(b.x*s,b.y*s,b.w*s,b.h*s);
+  ctx.fillStyle=c.roof;ctx.fillRect(b.x*s,b.y*s,b.w*s,Math.max(3,s*.5));
+  if(b.type!=='arch'){
+    ctx.fillStyle=c.win;
+    for(let wx=b.x+1;wx<b.x+b.w-1;wx+=2){
+      for(let wy=b.y+1;wy<b.y+b.h-1;wy+=2){
+        const ws=Math.max(2,s*.45);ctx.fillRect(wx*s+s*.28,wy*s+s*.28,ws,ws);
+      }
+    }
+  } else {
+    ctx.fillStyle=c.roof;
+    const ax=(b.x+b.door.dc)*s,ay=(b.y+b.door.dr-2)*s;
+    ctx.fillRect(ax,ay,s,s*2.5);
+  }
+  if(b.door){
+    ctx.fillStyle='#f5d060';
+    ctx.fillRect((b.x+b.door.dc)*s+s*.1,(b.y+b.door.dr)*s,s*.8,s*.85);
+    ctx.fillStyle='#c8a840';ctx.fillRect((b.x+b.door.dc)*s+s*.35,(b.y+b.door.dr)*s+s*.35,s*.15,s*.15);
+  }
+  if(D.zoom>=.6&&b.label){
+    const fs=Math.max(7,s*.52);ctx.font=`${fs}px monospace`;
+    ctx.fillStyle='rgba(0,0,0,.65)';
+    const tw=ctx.measureText(b.label).width;
+    ctx.fillText(b.label,b.x*s+(b.w*s-tw)/2,b.y*s+b.h*s-s*.25);
+  }
+  if(b.interior&&D.zoom>=.6){
+    ctx.fillStyle='rgba(245,208,96,.7)';ctx.font=`${Math.max(7,s*.42)}px monospace`;
+    ctx.fillText('[]',b.x*s+1,b.y*s+s*.7);
+  }
+  if(sel){ctx.strokeStyle='rgba(245,208,96,.9)';ctx.lineWidth=2;ctx.strokeRect(b.x*s+1,b.y*s+1,b.w*s-2,b.h*s-2)}
+}
+
+// ── PANEL ──────────────────────────────────────────────────────────────────
+function renderPanel(){
+  const el=document.getElementById('panel-content');
+  const mb=document.getElementById('mode-badge');
+  const modeLabels={place_building:'Click+drag to place building',place_item:'Click to place item',draw_zone:'Click+drag to draw zone',paint_palm:'Click tiles to paint palms',paint_lamp:'Click tiles to paint lamps',pick_npc_pos:'Click map to pick position'};
+  if(modeLabels[D.mode]){mb.textContent=modeLabels[D.mode];mb.style.display='inline'}
+  else{mb.style.display='none'}
+  el.innerHTML='';
+  if(D.activeTab==='map') renderMapTab(el);
+  else if(D.activeTab==='buildings') renderBuildingsTab(el);
+  else if(D.activeTab==='npcs') renderNpcsTab(el);
+  else if(D.activeTab==='items') renderItemsTab(el);
+  else if(D.activeTab==='zones') renderZonesTab(el);
+  else if(D.activeTab==='props') renderPropsTab(el);
+}
+
+function switchTab(t){
+  D.activeTab=t;
+  if(D.mode!=='select'&&D.mode!=='paint_palm'&&D.mode!=='paint_lamp'){D.mode='select';D.dragStart=null}
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.tab===t));
+  renderPanel();draw();
+}
+
+function renderMapTab(el){
+  el.innerHTML=`<div class="sec">Tile Legend</div>
+  ${[['Grass (walkable)',TCOL[0]],['Road (walkable)',TCOL[1]],['Pavement (walkable)',TCOL[2]],['Sand (walkable)',TCOL[3]],['Water (solid)',TCOL[4]],['Building',TCOL[5]],['Wall border',TCOL[6]],['Bridge',TCOL[7]],['Door',TCOL[8]]].map(([n,c])=>`<div class="legend-row"><div class="swatch" style="background:${c}"></div><span>${n}</span></div>`).join('')}
+  <div class="sec" style="margin-top:14px">World Summary</div>
+  <div style="color:#aaa;font-size:11px;line-height:1.8">
+    Size: 80 x 60 tiles (1280 x 960 px)<br>
+    Buildings: <b style="color:#eee">${D.buildings.length}</b> &nbsp; With interior: <b style="color:#eee">${D.buildings.filter(b=>b.interior).length}</b><br>
+    Outdoor NPCs: <b style="color:#eee">${D.npcs.length}</b><br>
+    World Items: <b style="color:#eee">${D.items.length}</b><br>
+    Zones: <b style="color:#eee">${D.zones.length}</b><br>
+    Palms: <b style="color:#eee">${D.palms.length}</b> &nbsp; Lamps: <b style="color:#eee">${D.lamps.length}</b>
+  </div>
+  <div class="sec" style="margin-top:14px">Note</div>
+  <div class="tip">Base map (roads, water, sand) is procedurally generated and cannot be edited. Use other tabs to place entities on top.</div>`;
+}
+
+function renderBuildingsTab(el){
+  let h=`<button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startPlaceBuilding()">+ Add Building (drag on map)</button>
+  <div class="sec">Buildings (${D.buildings.length})</div>
+  <ul class="elist">`;
+  D.buildings.forEach((b,i)=>{
+    const sel=D.selected&&D.selected.type==='building'&&D.selected.index===i;
+    h+=`<li class="${sel?'sel':''}" onclick="selectBuilding(${i})"><span>${b.label} <span style="color:#666;font-size:10px">[${b.type}]${b.interior?'[i]':''}</span></span><span class="x" onclick="event.stopPropagation();deleteBuilding(${i})">x</span></li>`;
+  });
+  h+=`</ul>`;el.innerHTML=h;
+  if(D.selected&&D.selected.type==='building') appendBuildingForm(el,D.selected.index);
+}
+
+function appendBuildingForm(el,idx){
+  const b=D.buildings[idx];
+  const d=document.createElement('div');
+  d.innerHTML=`<hr><div class="sec">Edit Building</div>
+  <div class="field"><label>Label</label><input type="text" value="${x(b.label)}" oninput="upB(${idx},'label',this.value)"></div>
+  <div class="field"><label>Type</label><select onchange="upB(${idx},'type',this.value)">${['bauhaus','cafe','market','arch','stone'].map(t=>`<option value="${t}"${b.type===t?' selected':''}>${t}</option>`).join('')}</select></div>
+  <div class="ifields">
+    <div class="field"><label>X</label><input type="number" value="${b.x}" min="0" max="79" oninput="upB(${idx},'x',+this.value)"></div>
+    <div class="field"><label>Y</label><input type="number" value="${b.y}" min="0" max="59" oninput="upB(${idx},'y',+this.value)"></div>
+    <div class="field"><label>W</label><input type="number" value="${b.w}" min="3" max="20" oninput="upB(${idx},'w',+this.value)"></div>
+    <div class="field"><label>H</label><input type="number" value="${b.h}" min="4" max="20" oninput="upB(${idx},'h',+this.value)"></div>
+  </div>
+  <div class="ifields">
+    <div class="field"><label>Door col offset</label><input type="number" value="${b.door.dc}" min="0" oninput="upBDoor(${idx},'dc',+this.value)"></div>
+    <div class="field"><label>Door row offset</label><input type="number" value="${b.door.dr}" min="0" oninput="upBDoor(${idx},'dr',+this.value)"></div>
+  </div>
+  <div class="field"><label><input type="checkbox"${b.interior?' checked':''} onchange="toggleInterior(${idx},this.checked)"> Has interior room?</label></div>
+  ${b.interior?interiorFormHTML(idx,b.interior):''}
+  <button class="btn" style="background:#c02840;width:100%;margin-top:6px" onclick="deleteBuilding(${idx})">Delete Building</button>`;
+  el.appendChild(d);
+}
+
+function interiorFormHTML(bIdx,key){
+  const n=D.interiors[key]||{};
+  return `<div class="sec">Interior: "${key}"</div>
+  <div class="field"><label>Room name</label><input type="text" value="${x(n.name||'')}" oninput="upI('${key}','name',this.value)"></div>
+  <div class="ifields">
+    <div class="field"><label>Room W</label><input type="number" value="${n.roomW||10}" min="4" max="30" oninput="upI('${key}','roomW',+this.value)"></div>
+    <div class="field"><label>Room H</label><input type="number" value="${n.roomH||8}" min="4" max="30" oninput="upI('${key}','roomH',+this.value)"></div>
+  </div>
+  <div class="ifields">
+    <div class="field"><label>BG color</label><input type="color" value="${n.bgColor||'#d4a860'}" oninput="upI('${key}','bgColor',this.value)"></div>
+    <div class="field"><label>Floor color</label><input type="color" value="${n.floorColor||'#c89050'}" oninput="upI('${key}','floorColor',this.value)"></div>
+    <div class="field"><label>Wall color</label><input type="color" value="${n.wallColor||'#e8c880'}" oninput="upI('${key}','wallColor',this.value)"></div>
+  </div>
+  <div class="ifields">
+    <div class="field"><label>Exit X</label><input type="number" value="${(n.exitTile||{x:5}).x}" min="0" oninput="upIExit('${key}','x',+this.value)"></div>
+    <div class="field"><label>Exit Y</label><input type="number" value="${(n.exitTile||{y:7}).y}" min="0" oninput="upIExit('${key}','y',+this.value)"></div>
+  </div>
+  <div class="sec" style="font-size:9px">Furniture (${(n.furniture||[]).length})</div>
+  ${(n.furniture||[]).map((f,fi)=>`<div class="sitem">
+    <span class="rx" onclick="remFurn('${key}',${fi})">x</span>
+    <div class="ifields">
+      <div class="field"><label>Type</label><select onchange="upFurn('${key}',${fi},'type',this.value)">${['counter','table','stall'].map(t=>`<option value="${t}"${f.type===t?' selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>Color</label><input type="color" value="${f.color||'#8b5a2a'}" oninput="upFurn('${key}',${fi},'color',this.value)"></div>
+    </div>
+    <div class="ifields">
+      <div class="field"><label>X</label><input type="number" value="${f.x}" min="0" oninput="upFurn('${key}',${fi},'x',+this.value)"></div>
+      <div class="field"><label>Y</label><input type="number" value="${f.y}" min="0" oninput="upFurn('${key}',${fi},'y',+this.value)"></div>
+      <div class="field"><label>W</label><input type="number" value="${f.w}" min="1" oninput="upFurn('${key}',${fi},'w',+this.value)"></div>
+      <div class="field"><label>H</label><input type="number" value="${f.h}" min="1" oninput="upFurn('${key}',${fi},'h',+this.value)"></div>
+    </div>
+  </div>`).join('')}
+  <button class="btn btn-sm" style="width:100%;margin-bottom:8px" onclick="addFurn('${key}')">+ Furniture</button>
+  <div class="sec" style="font-size:9px">Interior Items (${(n.items||[]).length})</div>
+  ${(n.items||[]).map((it,ii)=>`<div class="sitem">
+    <span class="rx" onclick="remIItem('${key}',${ii})">x</span>
+    <div class="ifields">
+      <div class="field"><label>X</label><input type="number" value="${it.x}" min="0" oninput="upIItem('${key}',${ii},'x',+this.value)"></div>
+      <div class="field"><label>Y</label><input type="number" value="${it.y}" min="0" oninput="upIItem('${key}',${ii},'y',+this.value)"></div>
+      <div class="field"><label>Color</label><input type="color" value="${it.color||'#f0c8a0'}" oninput="upIItem('${key}',${ii},'color',this.value)"></div>
+    </div>
+    <div class="field"><label>ID</label><input type="text" value="${x(it.id||'')}" oninput="upIItem('${key}',${ii},'id',this.value)"></div>
+    <div class="field"><label>Label</label><input type="text" value="${x(it.label||'')}" oninput="upIItem('${key}',${ii},'label',this.value)"></div>
+    <div class="field"><label>Desc</label><textarea oninput="upIItem('${key}',${ii},'desc',this.value)">${x(it.desc||'')}</textarea></div>
+  </div>`).join('')}
+  <button class="btn btn-sm" style="width:100%;margin-bottom:8px" onclick="addIItem('${key}')">+ Item</button>
+  <div class="sec" style="font-size:9px">Interior NPCs (${(n.npcs||[]).length})</div>
+  ${(n.npcs||[]).map((np,ni)=>`<div class="sitem">
+    <span class="rx" onclick="remINpc('${key}',${ni})">x</span>
+    <div class="field"><label>Name</label><input type="text" value="${x(np.name||'')}" oninput="upINpc('${key}',${ni},'name',this.value)"></div>
+    <div class="ifields">
+      <div class="field"><label>X</label><input type="number" value="${np.tx}" min="0" oninput="upINpc('${key}',${ni},'tx',+this.value)"></div>
+      <div class="field"><label>Y</label><input type="number" value="${np.ty}" min="0" oninput="upINpc('${key}',${ni},'ty',+this.value)"></div>
+    </div>
+    ${(np.lines||['','','']).map((ln,li)=>`<div class="field"><label>Line ${li+1}</label><input type="text" value="${x(ln)}" oninput="upINpcLine('${key}',${ni},${li},this.value)"></div>`).join('')}
+  </div>`).join('')}
+  <button class="btn btn-sm" style="width:100%;margin-bottom:4px" onclick="addINpc('${key}')">+ Interior NPC</button>`;
+}
+
+function renderNpcsTab(el){
+  let h=`<button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="addNpc()">+ Add NPC</button>
+  <div class="sec">Outdoor NPCs (${D.npcs.length})</div><ul class="elist">`;
+  D.npcs.forEach((npc,i)=>{
+    const sel=D.selected&&D.selected.type==='npc'&&D.selected.index===i;
+    h+=`<li class="${sel?'sel':''}" onclick="selectNpc(${i})"><span>${npc.name} <span style="color:#666;font-size:10px">${npc.schedule.length} slot${npc.schedule.length!==1?'s':''}</span></span><span class="x" onclick="event.stopPropagation();deleteNpc(${i})">x</span></li>`;
+  });
+  h+=`</ul>`;el.innerHTML=h;
+  if(D.selected&&D.selected.type==='npc') appendNpcForm(el,D.selected.index);
+}
+
+function appendNpcForm(el,idx){
+  const npc=D.npcs[idx];
+  const d=document.createElement('div');
+  d.innerHTML=`<hr><div class="sec">Edit NPC: ${x(npc.name)}</div>
+  <div class="field"><label>Name</label><input type="text" value="${x(npc.name)}" oninput="upN(${idx},'name',this.value)"></div>
+  <div class="sec" style="font-size:9px">Schedule (${npc.schedule.length} slots)</div>
+  ${npc.schedule.map((sl,si)=>`<div class="sitem">
+    <span class="rx" onclick="remNpcSlot(${idx},${si})">x</span>
+    <div class="ifields">
+      <div class="field"><label>Start hr</label><input type="number" value="${sl.start}" min="0" max="23" oninput="upNSlot(${idx},${si},'start',+this.value)"></div>
+      <div class="field"><label>End hr</label><input type="number" value="${sl.end}" min="0" max="23" oninput="upNSlot(${idx},${si},'end',+this.value)"></div>
+    </div>
+    <div class="ifields">
+      <div class="field"><label>Tile X</label><input type="number" value="${sl.tx}" min="0" max="79" oninput="upNSlot(${idx},${si},'tx',+this.value)"></div>
+      <div class="field"><label>Tile Y</label><input type="number" value="${sl.ty}" min="0" max="59" oninput="upNSlot(${idx},${si},'ty',+this.value)"></div>
+      <div class="field" style="display:flex;align-items:flex-end"><button class="btn btn-sm" onclick="startPickNpcPos(${idx},${si})" title="Click map to pick">Pick</button></div>
+    </div>
+    ${sl.lines.map((ln,li)=>`<div class="field"><label>Line ${li+1}</label><input type="text" value="${x(ln)}" oninput="upNLine(${idx},${si},${li},this.value)"></div>`).join('')}
+  </div>`).join('')}
+  <button class="btn btn-sm" style="width:100%;margin-bottom:8px" onclick="addNpcSlot(${idx})">+ Add Slot</button>
+  <button class="btn" style="background:#c02840;width:100%;margin-top:4px" onclick="deleteNpc(${idx})">Delete NPC</button>`;
+  el.appendChild(d);
+}
+
+function renderItemsTab(el){
+  let h=`<button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startPlaceItem()">+ Add Item (click map)</button>
+  <div class="sec">World Items (${D.items.length})</div><ul class="elist">`;
+  D.items.forEach((it,i)=>{
+    const sel=D.selected&&D.selected.type==='item'&&D.selected.index===i;
+    h+=`<li class="${sel?'sel':''}" onclick="selectItem(${i})"><span><span style="display:inline-block;width:9px;height:9px;background:${it.color||'#f0c8a0'};border-radius:50%;margin-right:4px;vertical-align:middle"></span>${it.label}</span><span class="x" onclick="event.stopPropagation();deleteItem(${i})">x</span></li>`;
+  });
+  h+=`</ul>`;el.innerHTML=h;
+  if(D.selected&&D.selected.type==='item') appendItemForm(el,D.selected.index);
+}
+
+function appendItemForm(el,idx){
+  const it=D.items[idx];
+  const d=document.createElement('div');
+  d.innerHTML=`<hr><div class="sec">Edit Item</div>
+  <div class="field"><label>ID</label><input type="text" value="${x(it.id)}" oninput="upItem(${idx},'id',this.value)"></div>
+  <div class="field"><label>Label</label><input type="text" value="${x(it.label)}" oninput="upItem(${idx},'label',this.value)"></div>
+  <div class="ifields">
+    <div class="field"><label>Tile X</label><input type="number" value="${it.tx}" min="0" max="79" oninput="upItem(${idx},'tx',+this.value)"></div>
+    <div class="field"><label>Tile Y</label><input type="number" value="${it.ty}" min="0" max="59" oninput="upItem(${idx},'ty',+this.value)"></div>
+    <div class="field"><label>Color</label><input type="color" value="${it.color||'#f0c8a0'}" oninput="upItem(${idx},'color',this.value)"></div>
+  </div>
+  <div class="field"><label>Description</label><textarea oninput="upItem(${idx},'desc',this.value)">${x(it.desc||'')}</textarea></div>
+  <button class="btn" style="background:#c02840;width:100%;margin-top:4px" onclick="deleteItem(${idx})">Delete Item</button>`;
+  el.appendChild(d);
+}
+
+function renderZonesTab(el){
+  let h=`<button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="startDrawZone()">+ Add Zone (drag on map)</button>
+  <div class="sec">Zones (${D.zones.length})</div><ul class="elist">`;
+  D.zones.forEach((z,i)=>{
+    const sel=D.selected&&D.selected.type==='zone'&&D.selected.index===i;
+    const solidCol=ZPALS[i%ZPALS.length].replace(/[\d.]+\)$/,'1)');
+    h+=`<li class="${sel?'sel':''}" onclick="selectZone(${i})"><span><span style="display:inline-block;width:9px;height:9px;background:${solidCol};border-radius:2px;margin-right:4px;vertical-align:middle"></span>${z.name}</span><span class="x" onclick="event.stopPropagation();deleteZone(${i})">x</span></li>`;
+  });
+  h+=`</ul>`;el.innerHTML=h;
+  if(D.selected&&D.selected.type==='zone') appendZoneForm(el,D.selected.index);
+}
+
+function appendZoneForm(el,idx){
+  const z=D.zones[idx];
+  const d=document.createElement('div');
+  d.innerHTML=`<hr><div class="sec">Edit Zone</div>
+  <div class="field"><label>Name</label><input type="text" value="${x(z.name)}" oninput="upZ(${idx},'name',this.value)"></div>
+  <div class="ifields">
+    <div class="field"><label>X1 (left)</label><input type="number" value="${z.x1}" min="0" max="79" oninput="upZ(${idx},'x1',+this.value)"></div>
+    <div class="field"><label>Y1 (top)</label><input type="number" value="${z.y1}" min="0" max="59" oninput="upZ(${idx},'y1',+this.value)"></div>
+  </div>
+  <div class="ifields">
+    <div class="field"><label>X2 (right)</label><input type="number" value="${z.x2}" min="0" max="79" oninput="upZ(${idx},'x2',+this.value)"></div>
+    <div class="field"><label>Y2 (bottom)</label><input type="number" value="${z.y2}" min="0" max="59" oninput="upZ(${idx},'y2',+this.value)"></div>
+  </div>
+  <div style="color:#888;font-size:11px;margin-bottom:8px">Size: ${z.x2-z.x1+1} x ${z.y2-z.y1+1} tiles</div>
+  <button class="btn" style="background:#c02840;width:100%;margin-top:2px" onclick="deleteZone(${idx})">Delete Zone</button>`;
+  el.appendChild(d);
+}
+
+function renderPropsTab(el){
+  el.innerHTML=`
+  <div class="sec">Palm Trees (${D.palms.length})</div>
+  <button class="btn${D.mode==='paint_palm'?' btn-accent':''}" style="width:100%;margin-bottom:5px" onclick="togglePaint('palm')">${D.mode==='paint_palm'?'Painting palms — click to stop':'Paint Palms'}</button>
+  <button class="btn btn-sm" style="width:100%;margin-bottom:14px;color:#f88" onclick="clearArr('palms')">Clear All Palms</button>
+  <div class="sec">Street Lamps (${D.lamps.length})</div>
+  <button class="btn${D.mode==='paint_lamp'?' btn-accent':''}" style="width:100%;margin-bottom:5px" onclick="togglePaint('lamp')">${D.mode==='paint_lamp'?'Painting lamps — click to stop':'Paint Lamps'}</button>
+  <button class="btn btn-sm" style="width:100%;margin-bottom:12px;color:#f88" onclick="clearArr('lamps')">Clear All Lamps</button>
+  <div class="tip">${(D.mode==='paint_palm'||D.mode==='paint_lamp')?'Click tiles to add. Click existing prop to remove. Esc to stop.':'Toggle paint mode, then click tiles on the map.'}</div>`;
+}
+
+// ── ENTITY CRUD ────────────────────────────────────────────────────────────
+function startPlaceBuilding(){D.mode='place_building';D.selected=null;renderPanel();draw();setStatus('Click and drag on map to place building')}
+function selectBuilding(i){D.selected={type:'building',index:i};renderPanel();draw()}
+function deleteBuilding(i){
+  const b=D.buildings[i];
+  if(b.interior)delete D.interiors[b.interior];
+  D.buildings.splice(i,1);
+  if(D.selected&&D.selected.type==='building'&&D.selected.index===i)D.selected=null;
+  autoSave();renderPanel();draw();
+}
+function upB(idx,f,v){D.buildings[idx][f]=v;autoSave();draw()}
+function upBDoor(idx,f,v){D.buildings[idx].door[f]=v;autoSave();draw()}
+function toggleInterior(bIdx,has){
+  const b=D.buildings[bIdx];
+  if(has){
+    const key=(b.label||'room').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,14)||'room'+bIdx;
+    b.interior=key;
+    if(!D.interiors[key])D.interiors[key]={name:b.label,roomW:12,roomH:9,bgColor:'#d4a860',floorColor:'#c89050',wallColor:'#e8c880',furniture:[],items:[],npcs:[],exitTile:{x:5,y:8}};
+  }else{if(b.interior)delete D.interiors[b.interior];delete b.interior}
+  autoSave();renderPanel();draw();
+}
+function upI(key,f,v){if(D.interiors[key])D.interiors[key][f]=v;autoSave()}
+function upIExit(key,ax,v){if(!D.interiors[key])return;if(!D.interiors[key].exitTile)D.interiors[key].exitTile={x:0,y:0};D.interiors[key].exitTile[ax]=v;autoSave()}
+function addFurn(key){(D.interiors[key].furniture=D.interiors[key].furniture||[]).push({type:'table',x:2,y:4,w:3,h:2,color:'#a07040'});autoSave();renderPanel()}
+function remFurn(key,fi){D.interiors[key].furniture.splice(fi,1);autoSave();renderPanel()}
+function upFurn(key,fi,f,v){D.interiors[key].furniture[fi][f]=v;autoSave()}
+function addIItem(key){(D.interiors[key].items=D.interiors[key].items||[]).push({x:4,y:4,id:'item'+Date.now(),label:'New Item',color:'#f0c8a0',desc:''});autoSave();renderPanel()}
+function remIItem(key,ii){D.interiors[key].items.splice(ii,1);autoSave();renderPanel()}
+function upIItem(key,ii,f,v){D.interiors[key].items[ii][f]=v;autoSave()}
+function addINpc(key){(D.interiors[key].npcs=D.interiors[key].npcs||[]).push({tx:2,ty:3,name:'NPC',lines:['Hello.','','']});autoSave();renderPanel()}
+function remINpc(key,ni){D.interiors[key].npcs.splice(ni,1);autoSave();renderPanel()}
+function upINpc(key,ni,f,v){D.interiors[key].npcs[ni][f]=v;autoSave()}
+function upINpcLine(key,ni,li,v){D.interiors[key].npcs[ni].lines[li]=v;autoSave()}
+
+function addNpc(){D.npcs.push({name:'New NPC',schedule:[{start:8,end:18,tx:20,ty:10,lines:['Hello.','','']}]});D.selected={type:'npc',index:D.npcs.length-1};autoSave();renderPanel();draw()}
+function selectNpc(i){D.selected={type:'npc',index:i};renderPanel();draw()}
+function deleteNpc(i){D.npcs.splice(i,1);if(D.selected&&D.selected.type==='npc'&&D.selected.index===i)D.selected=null;autoSave();renderPanel();draw()}
+function upN(idx,f,v){D.npcs[idx][f]=v;autoSave();draw()}
+function addNpcSlot(idx){D.npcs[idx].schedule.push({start:8,end:18,tx:20,ty:10,lines:['','','']});autoSave();renderPanel()}
+function remNpcSlot(idx,si){D.npcs[idx].schedule.splice(si,1);autoSave();renderPanel()}
+function upNSlot(idx,si,f,v){D.npcs[idx].schedule[si][f]=v;autoSave();draw()}
+function upNLine(idx,si,li,v){D.npcs[idx].schedule[si].lines[li]=v;autoSave()}
+function startPickNpcPos(ni,si){D.mode='pick_npc_pos';D.pickingSlot={npcIdx:ni,slotIdx:si};renderPanel();draw();setStatus(`Click map to set position for ${D.npcs[ni].name} slot ${si+1}`)}
+
+function startPlaceItem(){D.mode='place_item';D.selected=null;renderPanel();draw();setStatus('Click on map to place item')}
+function selectItem(i){D.selected={type:'item',index:i};renderPanel();draw()}
+function deleteItem(i){D.items.splice(i,1);if(D.selected&&D.selected.type==='item'&&D.selected.index===i)D.selected=null;autoSave();renderPanel();draw()}
+function upItem(idx,f,v){D.items[idx][f]=v;autoSave();draw()}
+
+function startDrawZone(){D.mode='draw_zone';D.selected=null;renderPanel();draw();setStatus('Click and drag on map to draw zone')}
+function selectZone(i){D.selected={type:'zone',index:i};renderPanel();draw()}
+function deleteZone(i){D.zones.splice(i,1);if(D.selected&&D.selected.type==='zone'&&D.selected.index===i)D.selected=null;autoSave();renderPanel();draw()}
+function upZ(idx,f,v){D.zones[idx][f]=v;autoSave();draw()}
+
+function togglePaint(type){D.mode=D.mode===`paint_${type}`?'select':`paint_${type}`;renderPanel();draw()}
+function clearArr(arr){if(!confirm(`Clear all ${arr}?`))return;D[arr]=[];autoSave();renderPanel();draw()}
+function toggleProp(arr,tx,ty){const i=D[arr].findIndex(p=>p.x===tx&&p.y===ty);if(i>=0)D[arr].splice(i,1);else D[arr].push({x:tx,y:ty});autoSave()}
+
+// ── CANVAS INPUT ───────────────────────────────────────────────────────────
+let mouseDown=false;
+
+cvs.addEventListener('mousemove',e=>{
+  const{tx,ty}=tileAt(e);
+  document.getElementById('coord-hud').textContent=`Tile: (${tx}, ${ty})`;
+  D.dragCur={tx,ty};
+  if(mouseDown){
+    if(D.mode==='paint_palm'&&!D.palms.find(p=>p.x===tx&&p.y===ty)){D.palms.push({x:tx,y:ty});autoSave();renderPanel()}
+    if(D.mode==='paint_lamp'&&!D.lamps.find(p=>p.x===tx&&p.y===ty)){D.lamps.push({x:tx,y:ty});autoSave();renderPanel()}
+  }
+  draw();
+});
+
+cvs.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  mouseDown=true;
+  const{tx,ty}=tileAt(e);
+  D.dragStart={tx,ty};D.dragCur={tx,ty};
+  if(D.mode==='place_building'){}
+  else if(D.mode==='draw_zone'){}
+  else if(D.mode==='place_item'){
+    D.items.push({tx,ty,id:'item'+Date.now(),label:'New Item',color:'#f0c8a0',desc:''});
+    D.selected={type:'item',index:D.items.length-1};
+    D.mode='select';autoSave();D.activeTab='items';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='items'));
+    renderPanel();draw();
+  }else if(D.mode==='pick_npc_pos'&&D.pickingSlot){
+    const{npcIdx,slotIdx}=D.pickingSlot;
+    D.npcs[npcIdx].schedule[slotIdx].tx=tx;D.npcs[npcIdx].schedule[slotIdx].ty=ty;
+    D.mode='select';D.pickingSlot=null;
+    autoSave();renderPanel();draw();setStatus(`Position set for ${D.npcs[npcIdx].name}`);
+  }else if(D.mode==='paint_palm'){toggleProp('palms',tx,ty);renderPanel();draw()}
+  else if(D.mode==='paint_lamp'){toggleProp('lamps',tx,ty);renderPanel();draw()}
+  else{hitTest(tx,ty)}
+});
+
+cvs.addEventListener('mouseup',e=>{
+  if(e.button!==0){mouseDown=false;return}
+  const{tx,ty}=tileAt(e);
+  if(D.mode==='place_building'&&D.dragStart){
+    const bx=Math.min(D.dragStart.tx,tx),by=Math.min(D.dragStart.ty,ty);
+    const bw=Math.max(3,Math.abs(tx-D.dragStart.tx)+1),bh=Math.max(4,Math.abs(ty-D.dragStart.ty)+1);
+    D.buildings.push({x:bx,y:by,w:bw,h:bh,label:'New Building',type:'bauhaus',door:{dc:1,dr:bh-1}});
+    D.selected={type:'building',index:D.buildings.length-1};
+    D.mode='select';D.dragStart=null;D.activeTab='buildings';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='buildings'));
+    autoSave();renderPanel();draw();
+  }else if(D.mode==='draw_zone'&&D.dragStart){
+    const zx1=Math.min(D.dragStart.tx,tx),zy1=Math.min(D.dragStart.ty,ty);
+    const zx2=Math.max(D.dragStart.tx,tx),zy2=Math.max(D.dragStart.ty,ty);
+    D.zones.push({name:'New Zone',x1:zx1,y1:zy1,x2:zx2,y2:zy2});
+    D.selected={type:'zone',index:D.zones.length-1};
+    D.mode='select';D.dragStart=null;D.activeTab='zones';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='zones'));
+    autoSave();renderPanel();draw();
+  }
+  mouseDown=false;
+});
+
+cvs.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(D.selected){const{type,index}=D.selected;
+    if(type==='building')deleteBuilding(index);
+    else if(type==='npc')deleteNpc(index);
+    else if(type==='item')deleteItem(index);
+    else if(type==='zone')deleteZone(index);
+  }
+});
+
+cvs.addEventListener('mouseleave',()=>{
+  D.dragCur=null;document.getElementById('coord-hud').textContent='Tile: (-, -)';
+  mouseDown=false;draw();
+});
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){D.mode='select';D.dragStart=null;D.pickingSlot=null;renderPanel();draw();setStatus('')}
+  if(e.key==='Delete'&&D.selected&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){
+    const{type,index}=D.selected;
+    if(type==='building')deleteBuilding(index);
+    else if(type==='npc')deleteNpc(index);
+    else if(type==='item')deleteItem(index);
+    else if(type==='zone')deleteZone(index);
+  }
+});
+
+function tileAt(e){
+  const r=cvs.getBoundingClientRect(),s=ts();
+  return{tx:Math.max(0,Math.min(COLS-1,Math.floor((e.clientX-r.left)/s))),ty:Math.max(0,Math.min(ROWS-1,Math.floor((e.clientY-r.top)/s)))};
+}
+
+function hitTest(tx,ty){
+  for(let i=D.buildings.length-1;i>=0;i--){const b=D.buildings[i];if(tx>=b.x&&tx<b.x+b.w&&ty>=b.y&&ty<b.y+b.h){D.selected={type:'building',index:i};D.activeTab='buildings';document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='buildings'));renderPanel();draw();return}}
+  for(let i=D.npcs.length-1;i>=0;i--){const npc=D.npcs[i];if(!npc.schedule||!npc.schedule.length)continue;const sl=npc.schedule[0];if(Math.abs(sl.tx-tx)<=1&&Math.abs(sl.ty-ty)<=1){D.selected={type:'npc',index:i};D.activeTab='npcs';document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='npcs'));renderPanel();draw();return}}
+  for(let i=D.items.length-1;i>=0;i--){const it=D.items[i];if(it.tx===tx&&it.ty===ty){D.selected={type:'item',index:i};D.activeTab='items';document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='items'));renderPanel();draw();return}}
+  for(let i=D.zones.length-1;i>=0;i--){const z=D.zones[i];if(tx>=z.x1&&tx<=z.x2&&ty>=z.y1&&ty<=z.y2){D.selected={type:'zone',index:i};D.activeTab='zones';document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='zones'));renderPanel();draw();return}}
+  D.selected=null;renderPanel();draw();
+}
+
+// ── ZOOM ───────────────────────────────────────────────────────────────────
+function setZoom(z){D.zoom=z;document.getElementById('zoom-lbl').textContent=Math.round(z*100)+'%';resizeCanvas();draw()}
+
+// ── SAVE / LOAD / EXPORT ───────────────────────────────────────────────────
+function snapshot(){return{buildings:D.buildings,interiors:D.interiors,npcs:D.npcs,zones:D.zones,items:D.items,palms:D.palms,lamps:D.lamps}}
+function autoSave(){try{localStorage.setItem('tlv_designer_save',JSON.stringify(snapshot()))}catch(e){}}
+function saveToStorage(){autoSave();setStatus('Saved to browser localStorage.')}
+function loadFromStorage(){const raw=localStorage.getItem('tlv_designer_save');if(!raw){setStatus('No save found in localStorage.');return}applyData(JSON.parse(raw));setStatus('Loaded from localStorage.')}
+function applyData(data){
+  D.buildings=data.buildings||[];D.interiors=data.interiors||{};D.npcs=data.npcs||[];
+  D.zones=data.zones||[];D.items=data.items||[];D.palms=data.palms||[];D.lamps=data.lamps||[];
+  D.selected=null;renderPanel();draw();
+}
+function doExportJSON(){
+  const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tlv-designer-save.json';a.click();
+}
+function doImportJSON(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{applyData(JSON.parse(ev.target.result));setStatus('Imported from file.')};r.readAsText(f);e.target.value=''}
+
+function showExportModal(){
+  document.getElementById('export-out').textContent=generateJS();
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open')}
+function copyExport(){navigator.clipboard.writeText(document.getElementById('export-out').textContent).then(()=>setStatus('Copied to clipboard!'))}
+
+function generateJS(){
+  const j=(v,sp)=>JSON.stringify(v,null,sp);
+  const bStr=D.buildings.map(b=>{
+    let s=`  {x:${b.x}, y:${b.y}, w:${b.w}, h:${b.h}, label:${JSON.stringify(b.label)}, type:${JSON.stringify(b.type)}, door:{dc:${b.door.dc},dr:${b.door.dr}}`;
+    if(b.interior)s+=`, interior:${JSON.stringify(b.interior)}`;
+    return s+'}';
+  }).join(',\n');
+  const palmStr=D.palms.map(p=>`{x:${p.x},y:${p.y}}`).join(', ');
+  const lampStr=D.lamps.map(l=>`{x:${l.x},y:${l.y}}`).join(', ');
+  return `const BUILDINGS=[\n${bStr}\n];\n\nconst INTERIORS=${j(D.interiors,2)};\n\nconst OUTDOOR_NPCS=${j(D.npcs,2)};\n\nconst ZONES=${j(D.zones,2)};\n\nconst WORLD_ITEMS=${j(D.items,2)};\n\nconst PALMS=[${palmStr}];\nconst LAMPS=[${lampStr}];`;
+}
+
+// ── UTILS ──────────────────────────────────────────────────────────────────
+function x(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function setStatus(msg){document.getElementById('status-bar').textContent=msg||'Ready'}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+buildBaseMap();
+const saved=localStorage.getItem('tlv_designer_save');
+if(saved){try{applyData(JSON.parse(saved));setStatus('Auto-loaded from localStorage.')}catch(e){applyData(DEFAULTS)}}
+else{applyData(DEFAULTS)}
+setZoom(1.0);
+renderPanel();
+draw();
+</script>
+</body>
+</html>
