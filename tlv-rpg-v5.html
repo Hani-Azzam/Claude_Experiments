@@ -30,10 +30,10 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 #btn-left  { top: 68px;  left: 0;   }
 #btn-right { top: 68px;  left: 136px; }
 #btn-talk {
-  position: absolute; bottom: 24px; right: 8px;
-  width: 140px; height: 140px;
+  position: absolute; bottom: 250px; left: 8px;
+  width: 90px; height: 90px;
   background: rgba(232,136,10,0.25); border: 4px solid rgba(245,208,96,0.9);
-  border-radius: 50%; color: #f5d060; font-size: 17px; font-weight: bold;
+  border-radius: 50%; color: #f5d060; font-size: 13px; font-weight: bold;
   font-family: monospace; display: flex; align-items: center; justify-content: center;
   cursor: pointer; user-select: none; -webkit-user-select: none;
 }
@@ -860,12 +860,16 @@ function drawDialogue(){
 }
 
 function drawMinimap(){
-  const MX=VW-204, MY=8, MW=196, MH=152;
+  const MX=VW-204, MY=VH-152-12, MW=196, MH=152;
   // Border/panel
   ctx.fillStyle='#000'; ctx.fillRect(MX-8,MY-8,MW+16,MH+16);
   ctx.strokeStyle='#000'; ctx.lineWidth=6; ctx.strokeRect(MX-3,MY-3,MW+6,MH+6);
   ctx.strokeStyle=P.orange; ctx.lineWidth=3; ctx.strokeRect(MX-2,MY-2,MW+4,MH+4);
   ctx.strokeStyle=P.gold; ctx.lineWidth=1; ctx.strokeRect(MX+1,MY+1,MW-2,MH-2);
+
+  // Clip all content to minimap bounds — nothing escapes the border
+  ctx.save();
+  ctx.beginPath(); ctx.rect(MX,MY,MW,MH); ctx.clip();
 
   if(S.minimapFull){
     // ── Full world view ──────────────────────────────────────
@@ -944,6 +948,8 @@ function drawMinimap(){
     ctx.font='bold 9px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(245,208,96,0.7)';
     ctx.fillText('TAP FOR WORLD MAP',MX+MW/2,MY+MH-4);
   }
+
+  ctx.restore(); // end clip
 }
 
 function drawZoneLabel(){
@@ -972,7 +978,7 @@ const FF_BTNS=[];
 
 function drawTimeHUD(){
   // Positioned below the minimap
-  const TX=VW-204, TY=168, TW=196, TH=50;
+  const TX=8, TY=8, TW=116, TH=50;
   const h=Math.floor(S.gameTime/60)%24;
   const m=Math.floor(S.gameTime%60);
   const ampm=h>=12?'PM':'AM';
@@ -1138,7 +1144,7 @@ canvas.addEventListener('pointerdown', e => {
   const rect = canvas.getBoundingClientRect();
   const cx = (e.clientX - rect.left) * (VW / rect.width);
   const cy = (e.clientY - rect.top)  * (VH / rect.height);
-  const MX=VW-204, MY=8, MW=196, MH=152;
+  const MX=VW-204, MY=VH-152-12, MW=196, MH=152;
   if(!S.indoor && cx>=MX-8 && cx<=MX+MW+8 && cy>=MY-8 && cy<=MY+MH+8){
     S.minimapFull = !S.minimapFull;
     e.stopPropagation();
