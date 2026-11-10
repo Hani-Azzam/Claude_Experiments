@@ -66,6 +66,6 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Session setup
 
-At the start of every new session, run `./setup.sh` before doing anything else. It installs the tools this project needs (currently `osmium-tool`, plus npm packages from `package.json` such as `leaflet`).
+At the start of every new session, run `./setup.sh` before doing anything else. It installs the tools this project needs (currently `osmium-tool`, plus npm packages from `package.json` such as `leaflet`). It also downloads the Israel & Palestine OSM extract into `data/` and crops `data/yavne.osm.pbf` from it.
 
 Whenever you install a new tool during a session, add it to `setup.sh` and commit the change.
