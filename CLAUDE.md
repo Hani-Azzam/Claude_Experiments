@@ -63,3 +63,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## Session setup
+
+At the start of every new session, run `./setup.sh` before doing anything else. It installs the tools this project needs (currently `osmium-tool`).
+
+Whenever you install a new tool during a session, add it to `setup.sh` and commit the change.
