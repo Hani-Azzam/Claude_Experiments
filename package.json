@@ -1,0 +1,23 @@
+{
+  "name": "claude_experiments",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hani-Azzam/Claude_Experiments.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Hani-Azzam/Claude_Experiments/issues"
+  },
+  "homepage": "https://github.com/Hani-Azzam/Claude_Experiments#readme",
+  "dependencies": {
+    "leaflet": "^1.9.4"
+  }
+}
