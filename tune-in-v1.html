@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Tune In</title>
+  <style>
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      touch-action: none;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <!-- Controls and HUD are drawn on the canvas as part of the radio so they scale with it. -->
+  <div id="ui"></div>
+  <script>
+    // ===== 1. CONSTANTS =====
+    const W = 480, H = 640;
+    const ROUNDS = 8;
+    const MAX_PTS = 4;
+    const WIN_SCORE = 18;
+
+    const BAND = { x: 40, y: 318, w: 400, h: 104 };
+    const WINDOW = { x: 20, y: 280, w: 440, h: 174 };
+    const GRILLE = { x: 24, y: 78, w: 432, h: 196 };
+    const CARD = { x: 64, y: 90, w: 352, h: 172 };
+
+    // Scoring zones in band units (0–100), widest first
+    const ZONES = [
+      { r: 12.5, pts: 2 },
+      { r: 7.5, pts: 3 },
+      { r: 2.5, pts: 4 },
+    ];
+    const TARGET_MIN = 4, TARGET_MAX = 96;
+
+    const NEEDLE_START = 50;
+    const NEEDLE_SPEED_MIN = 10;   // units/s when a tune button is first pressed
+    const NEEDLE_SPEED_MAX = 70;   // units/s after holding
+    const NEEDLE_ACCEL_TIME = 0.9; // s to reach max speed
+    const REVEAL_TIME = 1.1;       // s for the signal sweep
+    const FLASH_TIME = 0.12;
+    const NOISE_DOTS = 260;
+
+    const BTN_LEFT = { x: 82, y: 556, r: 34 };
+    const BTN_RIGHT = { x: 172, y: 556, r: 34 };
+    const BTN_ACTION = { x: 262, y: 522, w: 186, h: 68 };
+
+    const C = {
+      walnut: '#5A3A22',
+      walnutDark: '#3E2716',
+      cream: '#EFE4C8',
+      creamDark: '#D8CBA8',
+      red: '#C8321E',
+      redDark: '#8E2214',
+      bakelite: '#2B2B2B',
+      bakeliteDark: '#151515',
+      brass: '#B8A060',
+      brassDark: '#7E6C3A',
+      amber: '#D9822B',
+      ink: '#3A2614',
+    };
+
+    const SERIF = 'Georgia, "Times New Roman", serif';
+    const BEST_KEY = 'tunein_best';
+
+    const CARDS = [
+      ['Cold', 'Hot'], ['Useless', 'Useful'], ['Boring', 'Thrilling'],
+      ['Cheap', 'Pricey'], ['Tiny', 'Enormous'], ['Easy', 'Difficult'],
+      ['Rough', 'Smooth'], ['Quiet', 'Loud'], ['Bad idea', 'Good idea'],
+      ['Unhealthy', 'Healthy'], ['Normal', 'Weird'], ['Forgettable', 'Unforgettable'],
+      ['Old-fashioned', 'Futuristic'], ['Smells awful', 'Smells lovely'],
+      ['Villain', 'Hero'], ['Fragile', 'Indestructible'], ['Casual', 'Formal'],
+      ['Mild', 'Spicy'], ['Rare', 'Everywhere'], ['Dangerous', 'Safe'],
+      ['Soft', 'Hard'], ['Wet', 'Dry'], ['Fictional', 'Real'],
+      ['Low-tech', 'High-tech'], ['Indoors', 'Outdoors'], ['Snack', 'Feast'],
+      ['For kids', 'For grown-ups'], ['Relaxing', 'Stressful'], ['Niche', 'Mainstream'],
+      ['Comforting', 'Creepy'], ['Slow', 'Fast'], ['Light', 'Heavy'],
+      ['Hated', 'Loved'], ['Terrible pet', 'Perfect pet'], ['Lazy', 'Hard-working'],
+      ['Sweet', 'Savory'], ['Harmless', 'Deadly'], ['Simple', 'Complicated'],
+      ['Calm', 'Chaotic'], ['Tacky', 'Classy'], ['Tastes bad', 'Tastes great'],
+      ['Temporary', 'Forever'], ['Clean', 'Filthy'], ['Polite', 'Rude'],
+      ['Ordinary', 'Magical'], ['Bad habit', 'Good habit'], ['Round', 'Pointy'],
+      ['Nerdy', 'Cool'], ['Morning', 'Midnight'], ['Lame superpower', 'Best superpower'],
+      ['Ancient', 'Brand new'], ['Sad', 'Joyful'], ['Weak', 'Strong'],
+      ['Short-lived', 'Long-lasting'], ['Bad gift', 'Great gift'], ['Flat', 'Bumpy'],
+      ['Silly', 'Serious'], ['Humble', 'Show-off'], ['Natural', 'Artificial'],
+      ['Useless skill', 'Useful skill'], ['Bland', 'Flavorful'], ['Mess', 'Masterpiece'],
+    ];
+
+    const RESULT_TEXT = {
+      4: 'Perfect reception!',
+      3: 'Strong signal',
+      2: 'Faint signal',
+      0: 'Just static…',
+    };
+
+    // ===== 2. STATE =====
+    const S = {
+      phase: 'TITLE', // TITLE, PASS, PEEK, GUESS, REVEAL, END
+      round: 0,
+      score: 0,
+      best: 0,
+      deck: [],
+      card: CARDS[0],
+      target: 70,
+      needle: NEEDLE_START,
+      roundPts: 0,
+      revealT: 0,
+      scored: false,
+      holdT: 0,
+      time: 0,
+      flash: 0,
+      keys: { left: false, right: false },
+      pointers: {}, // pointerId -> 'left' | 'right' | 'band'
+    };
+
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const bg = document.createElement('canvas');
+    let scale = 1;
+
+    // ===== 3. INIT =====
+    function init(phase) {
+      S.phase = phase;
+      S.round = 0;
+      S.score = 0;
+      S.deck = shuffle(CARDS.slice());
+      S.card = ['Cold', 'Hot'];
+      S.target = 70;
+      S.needle = NEEDLE_START;
+      S.revealT = 0;
+      S.holdT = 0;
+      S.best = loadBest();
+      if (phase === 'PASS') nextRound();
+    }
+
+    function nextRound() {
+      S.round++;
+      S.card = S.deck.pop();
+      S.target = TARGET_MIN + Math.random() * (TARGET_MAX - TARGET_MIN);
+      S.needle = NEEDLE_START;
+      S.revealT = 0;
+      S.scored = false;
+      S.phase = 'PASS';
+    }
+
+    function shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function scoreFor(needle, target) {
+      const d = Math.abs(needle - target);
+      let pts = 0;
+      for (const z of ZONES) if (d <= z.r) pts = z.pts;
+      return pts;
+    }
+
+    function loadBest() {
+      try { return parseInt(sessionStorage.getItem(BEST_KEY), 10) || 0; } catch (e) { return 0; }
+    }
+
+    function saveBest(v) {
+      try { sessionStorage.setItem(BEST_KEY, String(v)); } catch (e) { /* storage unavailable */ }
+    }
+
+    // ===== 4. UPDATE =====
+    function update(dt) {
+      S.time += dt;
+      S.flash = Math.max(0, S.flash - dt);
+
+      if (S.phase === 'GUESS') updateNeedle(dt);
+
+      if (S.phase === 'REVEAL' && S.revealT < 1) {
+        S.revealT = Math.min(1, S.revealT + dt / REVEAL_TIME);
+        if (S.revealT >= 1 && !S.scored) {
+          S.scored = true;
+          S.score += S.roundPts;
+        }
+      }
+    }
+
+    function updateNeedle(dt) {
+      const held = heldDirs();
+      const dir = (held.right ? 1 : 0) - (held.left ? 1 : 0);
+      if (!dir) { S.holdT = 0; return; }
+      S.holdT += dt;
+      const k = Math.min(1, S.holdT / NEEDLE_ACCEL_TIME);
+      const speed = NEEDLE_SPEED_MIN + (NEEDLE_SPEED_MAX - NEEDLE_SPEED_MIN) * k * k;
+      S.needle = clamp(S.needle + dir * speed * dt, 0, 100);
+    }
+
+    function heldDirs() {
+      const p = Object.values(S.pointers);
+      return {
+        left: S.keys.left || p.includes('left'),
+        right: S.keys.right || p.includes('right'),
+      };
+    }
+
+    function doAction() {
+      S.flash = FLASH_TIME;
+      switch (S.phase) {
+        case 'TITLE': init('PASS'); break;
+        case 'PASS': S.phase = 'PEEK'; break;
+        case 'PEEK': S.phase = 'GUESS'; S.needle = NEEDLE_START; break;
+        case 'GUESS':
+          S.roundPts = scoreFor(S.needle, S.target);
+          S.revealT = 0;
+          S.phase = 'REVEAL';
+          break;
+        case 'REVEAL':
+          if (S.revealT < 1) return; // let the sweep finish
+          if (S.round < ROUNDS) nextRound();
+          else endGame();
+          break;
+        case 'END': init('PASS'); break;
+      }
+    }
+
+    function endGame() {
+      S.phase = 'END';
+      if (S.score > S.best) { S.best = S.score; saveBest(S.best); }
+    }
+
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function bandX(u) { return BAND.x + (u / 100) * BAND.w; }
+
+    // ===== 5. DRAW =====
+    function draw() {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(bg, 0, 0);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+      drawHud();
+      drawCard();
+      drawWords();
+      drawBand();
+      drawHint();
+      drawControls();
+    }
+
+    // --- static background, rendered once per resize ---
+    function renderBackground() {
+      const b = bg.getContext('2d');
+      b.imageSmoothingEnabled = false;
+      b.setTransform(scale, 0, 0, scale, 0, 0);
+      const rand = seeded(7);
+
+      b.fillStyle = '#000';
+      b.fillRect(0, 0, W, H);
+      roundRect(b, 4, 4, W - 8, H - 8, 26);
+      b.fillStyle = C.walnut;
+      b.fill();
+
+      // Wood grain
+      b.save();
+      roundRect(b, 4, 4, W - 8, H - 8, 26);
+      b.clip();
+      for (let i = 0; i < 70; i++) {
+        const y0 = rand() * H;
+        const amp = 2 + rand() * 6;
+        const freq = 0.006 + rand() * 0.012;
+        const ph = rand() * 6.28;
+        b.strokeStyle = rand() < 0.6 ? 'rgba(40,20,8,0.28)' : 'rgba(140,95,55,0.18)';
+        b.lineWidth = 0.6 + rand() * 1.6;
+        b.beginPath();
+        for (let x = 0; x <= W; x += 8) {
+          const y = y0 + Math.sin(x * freq + ph) * amp + Math.sin(x * 0.05 + ph) * 0.8;
+          x ? b.lineTo(x, y) : b.moveTo(x, y);
+        }
+        b.stroke();
+      }
+      b.restore();
+
+      // Logo
+      b.fillStyle = C.brass;
+      b.font = `italic bold 34px ${SERIF}`;
+      b.textAlign = 'left';
+      b.textBaseline = 'alphabetic';
+      b.fillText('Tune In', 30, 50);
+      b.font = `bold 9px ${SERIF}`;
+      b.fillText('S I X   T R A N S I S T O R   ·   P A S S  &  P L A Y', 32, 66);
+
+      // Speaker grille
+      roundRect(b, GRILLE.x - 3, GRILLE.y - 3, GRILLE.w + 6, GRILLE.h + 6, 14);
+      b.fillStyle = C.brass;
+      b.fill();
+      roundRect(b, GRILLE.x, GRILLE.y, GRILLE.w, GRILLE.h, 12);
+      b.fillStyle = C.bakelite;
+      b.fill();
+      for (let y = GRILLE.y + 9; y < GRILLE.y + GRILLE.h - 4; y += 10) {
+        for (let x = GRILLE.x + 9; x < GRILLE.x + GRILLE.w - 4; x += 10) {
+          b.fillStyle = C.bakeliteDark;
+          b.beginPath(); b.arc(x, y, 2.4, 0, 6.283); b.fill();
+          b.fillStyle = 'rgba(184,160,96,0.22)';
+          b.fillRect(x - 1, y + 2, 2, 1);
+        }
+      }
+
+      // Dial window bezel
+      roundRect(b, WINDOW.x, WINDOW.y, WINDOW.w, WINDOW.h, 14);
+      b.fillStyle = C.brass;
+      b.fill();
+      roundRect(b, WINDOW.x + 4, WINDOW.y + 4, WINDOW.w - 8, WINDOW.h - 8, 11);
+      b.fillStyle = C.bakelite;
+      b.fill();
+
+      // Divider above controls
+      b.fillStyle = C.brassDark;
+      b.fillRect(20, 470, W - 40, 3);
+      b.fillStyle = C.brass;
+      b.fillRect(20, 470, W - 40, 1);
+    }
+
+    function drawHud() {
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = C.brass;
+      ctx.font = `bold 13px ${SERIF}`;
+      if (S.phase === 'TITLE' || S.phase === 'END') {
+        ctx.fillText(`BEST  ${S.best} / ${ROUNDS * MAX_PTS}`, W - 30, 46);
+      } else {
+        ctx.fillText(`ROUND  ${S.round} / ${ROUNDS}`, W - 30, 38);
+        ctx.fillText(`SCORE  ${S.score}`, W - 30, 58);
+      }
+    }
+
+    // Cream label plate over the grille, carries the phase message
+    function drawCard() {
+      const { x, y, w, h } = CARD;
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      roundRect(ctx, x + 3, y + 4, w, h, 8); ctx.fill();
+      ctx.fillStyle = C.cream;
+      roundRect(ctx, x, y, w, h, 8); ctx.fill();
+      ctx.strokeStyle = C.creamDark;
+      ctx.lineWidth = 2;
+      roundRect(ctx, x + 6, y + 6, w - 12, h - 12, 5); ctx.stroke();
+      for (const [sx, sy] of [[x + 14, y + 14], [x + w - 14, y + 14], [x + 14, y + h - 14], [x + w - 14, y + h - 14]]) {
+        drawScrew(sx, sy);
+      }
+
+      const cx = x + w / 2;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+
+      if (S.phase === 'TITLE') {
+        cardTitle('HOW TO PLAY', 22);
+        cardBody('One player secretly sees where the signal sits between two opposites and says a clue out loud. The rest tune the needle to find it.', 68);
+        ctx.fillStyle = C.red;
+        ctx.font = `bold 15px ${SERIF}`;
+        ctx.fillText(`${ROUNDS} rounds  ·  score ${WIN_SCORE}+ to win`, cx, y + h - 22);
+      } else if (S.phase === 'PASS') {
+        cardTitle(`ROUND ${S.round} OF ${ROUNDS}`, 24);
+        cardBody('Pass the radio to this round’s clue-giver. Everyone else — look away!', 72);
+      } else if (S.phase === 'PEEK') {
+        cardTitle('ONLY YOU SEE THIS', 22);
+        cardBody('Think of a clue that lands on the dark stripe between these two ends. Say it out loud, then hide the signal.', 66);
+      } else if (S.phase === 'GUESS') {
+        cardTitle('TUNE IN', 24);
+        cardBody('Talk it over, then move the red needle to where the clue belongs on the dial.', 72);
+      } else if (S.phase === 'REVEAL') {
+        drawRevealCard(cx);
+      } else if (S.phase === 'END') {
+        drawEndCard(cx);
+      }
+    }
+
+    function drawRevealCard(cx) {
+      const { y } = CARD;
+      if (S.revealT < 1) {
+        const dots = '.'.repeat(1 + Math.floor(S.time * 4) % 3);
+        cardTitle('RECEIVING' + dots, 24);
+        return;
+      }
+      ctx.fillStyle = S.roundPts ? C.red : C.ink;
+      ctx.font = `bold 56px ${SERIF}`;
+      ctx.fillText(S.roundPts ? `+${S.roundPts}` : '0', cx, y + 84);
+      ctx.fillStyle = C.ink;
+      ctx.font = `bold 20px ${SERIF}`;
+      ctx.fillText(RESULT_TEXT[S.roundPts], cx, y + 118);
+      ctx.font = `15px ${SERIF}`;
+      ctx.fillText(`Total score: ${S.score}`, cx, y + 146);
+    }
+
+    function drawEndCard(cx) {
+      const { y } = CARD;
+      const won = S.score >= WIN_SCORE;
+      ctx.fillStyle = won ? C.red : C.ink;
+      ctx.font = `bold 28px ${SERIF}`;
+      ctx.fillText(won ? 'CLEAR SIGNAL!' : 'LOST IN STATIC', cx, y + 46);
+      ctx.fillStyle = C.ink;
+      ctx.font = `bold 44px ${SERIF}`;
+      ctx.fillText(`${S.score} / ${ROUNDS * MAX_PTS}`, cx, y + 100);
+      ctx.font = `16px ${SERIF}`;
+      ctx.fillText(won ? 'Your team is on the same wavelength.' : `You needed ${WIN_SCORE}. Try another broadcast!`, cx, y + 128);
+      ctx.font = `italic 14px ${SERIF}`;
+      ctx.fillText(`Best this session: ${S.best}`, cx, y + 150);
+    }
+
+    function cardTitle(text, size) {
+      ctx.fillStyle = C.red;
+      ctx.font = `bold ${size}px ${SERIF}`;
+      ctx.fillText(text, CARD.x + CARD.w / 2, CARD.y + 42);
+    }
+
+    function cardBody(text, top) {
+      ctx.fillStyle = C.ink;
+      ctx.font = `16px ${SERIF}`;
+      const lines = wrap(text, CARD.w - 56);
+      lines.forEach((ln, i) => ctx.fillText(ln, CARD.x + CARD.w / 2, CARD.y + top + i * 21));
+    }
+
+    function drawScrew(x, y) {
+      ctx.fillStyle = C.brass;
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = C.brassDark;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(x - 3, y + 1); ctx.lineTo(x + 3, y - 1); ctx.stroke();
+    }
+
+    // Spectrum ends above the band
+    function drawWords() {
+      const y = BAND.y - 13;
+      const maxW = BAND.w / 2 - 10;
+      const [l, r] = S.card;
+      ctx.textBaseline = 'alphabetic';
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = C.red;
+      ctx.font = `bold 14px ${SERIF}`;
+      ctx.fillText('◀', BAND.x, y);
+      ctx.fillStyle = C.cream;
+      ctx.font = fitFont(l.toUpperCase(), maxW - 18, 19);
+      ctx.fillText(l.toUpperCase(), BAND.x + 18, y);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = C.red;
+      ctx.font = `bold 14px ${SERIF}`;
+      ctx.fillText('▶', BAND.x + BAND.w, y);
+      ctx.fillStyle = C.cream;
+      ctx.font = fitFont(r.toUpperCase(), maxW - 18, 19);
+      ctx.fillText(r.toUpperCase(), BAND.x + BAND.w - 18, y);
+    }
+
+    function drawBand() {
+      const { x, y, w, h } = BAND;
+      ctx.fillStyle = C.cream;
+      ctx.fillRect(x, y, w, h);
+
+      const showTarget = S.phase === 'PEEK' || S.phase === 'TITLE' ||
+        (S.phase === 'REVEAL') || S.phase === 'END';
+      if (showTarget) {
+        ctx.save();
+        ctx.beginPath();
+        const sweep = S.phase === 'REVEAL' ? easeOut(S.revealT) : 1;
+        ctx.rect(x, y, w * sweep, h);
+        ctx.clip();
+        drawTarget();
+        ctx.restore();
+      }
+
+      drawScale();
+
+      if (S.phase === 'PASS') drawStatic();
+      if (S.phase === 'GUESS' || S.phase === 'REVEAL' || S.phase === 'END' || S.phase === 'TITLE') drawNeedle();
+
+      // Glass glare
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(x, y + 4, w, 10);
+    }
+
+    function drawTarget() {
+      const { y, h } = BAND;
+      const colors = { 2: C.brass, 3: C.amber, 4: C.bakelite };
+      for (const z of ZONES) {
+        ctx.fillStyle = colors[z.pts];
+        ctx.fillRect(bandX(S.target - z.r), y, (z.r * 2 / 100) * BAND.w, h);
+      }
+      // Point values along the bottom of each stripe
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = `bold 15px ${SERIF}`;
+      const labels = [[-10, 2], [-5, 3], [0, 4], [5, 3], [10, 2]];
+      for (const [off, pts] of labels) {
+        const u = S.target + off;
+        if (u < 1 || u > 99) continue;
+        ctx.fillStyle = pts === 4 ? C.cream : C.ink;
+        ctx.fillText(pts, bandX(u), y + h - 10);
+      }
+    }
+
+    // Decorative radio frequency scale
+    function drawScale() {
+      const { x, y, w } = BAND;
+      ctx.fillStyle = C.ink;
+      for (let i = 0; i <= 50; i++) {
+        const tx = x + (i / 50) * w;
+        const tall = i % 5 === 0;
+        ctx.fillRect(Math.round(tx) - (tall ? 1 : 0.5), y + 18, tall ? 2 : 1, tall ? 16 : 8);
+      }
+      const freqs = ['55', '60', '70', '80', '90', '100', '120', '140', '160'];
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = `bold 13px ${SERIF}`;
+      freqs.forEach((f, i) => ctx.fillText(f, x + ((i + 1) / 10) * w, y + 52));
+      ctx.font = `italic 10px ${SERIF}`;
+      ctx.fillText('KC', x + w - 12, y + 52);
+    }
+
+    function drawStatic() {
+      const { x, y, w, h } = BAND;
+      ctx.fillStyle = C.bakelite;
+      ctx.fillRect(x, y, w, h);
+      for (let i = 0; i < NOISE_DOTS; i++) {
+        const g = Math.random();
+        ctx.fillStyle = g < 0.5 ? 'rgba(239,228,200,0.35)' : 'rgba(239,228,200,0.12)';
+        ctx.fillRect(x + Math.random() * w, y + Math.random() * h, 2 + Math.random() * 3, 2);
+      }
+      ctx.fillStyle = C.cream;
+      ctx.font = `bold 18px ${SERIF}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('—  OFF AIR  —', x + w / 2, y + h / 2);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    function drawNeedle() {
+      // Title screen: a lazy demo sweep
+      const u = S.phase === 'TITLE' ? 50 + Math.sin(S.time * 0.9) * 30 : S.needle;
+      const nx = bandX(u);
+      const { y, h } = BAND;
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(nx + 1, y - 6, 3, h + 12);
+      ctx.fillStyle = C.red;
+      ctx.fillRect(nx - 1.5, y - 6, 3, h + 12);
+      ctx.beginPath();
+      ctx.moveTo(nx - 6, y - 9); ctx.lineTo(nx + 6, y - 9); ctx.lineTo(nx, y - 1);
+      ctx.closePath(); ctx.fill();
+    }
+
+    function drawHint() {
+      const hints = {
+        TITLE: 'Press ENTER or tap START',
+        PASS: 'Clue-giver: tap PEEK when no one is looking',
+        PEEK: 'Say your clue out loud, then tap HIDE',
+        GUESS: '◀ ▶ or drag the dial  ·  SPACE to lock in',
+        REVEAL: S.revealT < 1 ? '' : (S.round < ROUNDS ? 'Tap NEXT for the next round' : 'Tap RESULTS to finish'),
+        END: 'Press ENTER or tap NEW GAME',
+      };
+      ctx.fillStyle = C.creamDark;
+      ctx.font = `italic 13px ${SERIF}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(hints[S.phase], W / 2, BAND.y + BAND.h + 22);
+    }
+
+    function drawControls() {
+      const tuneOn = S.phase === 'GUESS';
+      const held = heldDirs();
+      drawRoundButton(BTN_LEFT, -1, tuneOn, tuneOn && held.left);
+      drawRoundButton(BTN_RIGHT, 1, tuneOn, tuneOn && held.right);
+      ctx.globalAlpha = tuneOn ? 1 : 0.4;
+      ctx.fillStyle = C.brass;
+      ctx.font = `bold 11px ${SERIF}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('T U N E', (BTN_LEFT.x + BTN_RIGHT.x) / 2, BTN_LEFT.y + BTN_LEFT.r + 26);
+      ctx.globalAlpha = 1;
+
+      const labels = {
+        TITLE: 'START', PASS: 'PEEK', PEEK: 'HIDE', GUESS: 'LOCK IN',
+        REVEAL: S.round < ROUNDS ? 'NEXT' : 'RESULTS', END: 'NEW GAME',
+      };
+      const waiting = S.phase === 'REVEAL' && S.revealT < 1;
+      const pressed = S.flash > 0;
+      const b = BTN_ACTION;
+      const off = pressed ? 3 : 0;
+      ctx.fillStyle = C.redDark;
+      roundRect(ctx, b.x, b.y + 5, b.w, b.h, 14); ctx.fill();
+      ctx.globalAlpha = waiting ? 0.45 : 1;
+      ctx.fillStyle = C.red;
+      roundRect(ctx, b.x, b.y + off, b.w, b.h, 14); ctx.fill();
+      ctx.strokeStyle = C.brass;
+      ctx.lineWidth = 2;
+      roundRect(ctx, b.x + 5, b.y + off + 5, b.w - 10, b.h - 10, 10); ctx.stroke();
+      ctx.fillStyle = C.cream;
+      ctx.font = `bold 22px ${SERIF}`;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labels[S.phase], b.x + b.w / 2, b.y + off + b.h / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = C.brass;
+      ctx.font = `bold 11px ${SERIF}`;
+      ctx.fillText('S P A C E', b.x + b.w / 2, BTN_LEFT.y + BTN_LEFT.r + 26);
+    }
+
+    function drawRoundButton(btn, dir, enabled, pressed) {
+      const off = pressed ? 3 : 0;
+      ctx.globalAlpha = enabled ? 1 : 0.4;
+      ctx.fillStyle = C.bakeliteDark;
+      ctx.beginPath(); ctx.arc(btn.x, btn.y + 5, btn.r, 0, 6.283); ctx.fill();
+      ctx.fillStyle = C.brass;
+      ctx.beginPath(); ctx.arc(btn.x, btn.y + off, btn.r, 0, 6.283); ctx.fill();
+      ctx.fillStyle = pressed ? C.bakeliteDark : C.bakelite;
+      ctx.beginPath(); ctx.arc(btn.x, btn.y + off, btn.r - 4, 0, 6.283); ctx.fill();
+      // Knurled rim
+      ctx.strokeStyle = 'rgba(184,160,96,0.35)';
+      ctx.lineWidth = 1;
+      for (let a = 0; a < 6.283; a += 0.26) {
+        ctx.beginPath();
+        ctx.moveTo(btn.x + Math.cos(a) * (btn.r - 10), btn.y + off + Math.sin(a) * (btn.r - 10));
+        ctx.lineTo(btn.x + Math.cos(a) * (btn.r - 5), btn.y + off + Math.sin(a) * (btn.r - 5));
+        ctx.stroke();
+      }
+      ctx.fillStyle = C.cream;
+      ctx.beginPath();
+      ctx.moveTo(btn.x + dir * 11, btn.y + off);
+      ctx.lineTo(btn.x - dir * 8, btn.y + off - 11);
+      ctx.lineTo(btn.x - dir * 8, btn.y + off + 11);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // --- draw helpers ---
+    function roundRect(c, x, y, w, h, r) {
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.arcTo(x + w, y, x + w, y + h, r);
+      c.arcTo(x + w, y + h, x, y + h, r);
+      c.arcTo(x, y + h, x, y, r);
+      c.arcTo(x, y, x + w, y, r);
+      c.closePath();
+    }
+
+    function wrap(text, maxW) {
+      const words = text.split(' ');
+      const lines = [];
+      let line = '';
+      for (const wd of words) {
+        const test = line ? line + ' ' + wd : wd;
+        if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = wd; }
+        else line = test;
+      }
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    function fitFont(text, maxW, size) {
+      let s = size;
+      do {
+        ctx.font = `bold ${s}px ${SERIF}`;
+        if (ctx.measureText(text).width <= maxW) break;
+        s--;
+      } while (s > 10);
+      return ctx.font;
+    }
+
+    function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+    function seeded(seed) {
+      let a = seed;
+      return () => {
+        a |= 0; a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // ===== 6. INPUT (keyboard + touch/mouse unified) =====
+    function handleInput() {
+      window.addEventListener('keydown', e => {
+        const k = e.key;
+        if (k === 'ArrowLeft' || k === 'a' || k === 'A') S.keys.left = true;
+        else if (k === 'ArrowRight' || k === 'd' || k === 'D') S.keys.right = true;
+        else if ((k === ' ' || k === 'Enter') && !e.repeat) doAction();
+        else return;
+        e.preventDefault();
+      });
+      window.addEventListener('keyup', e => {
+        const k = e.key;
+        if (k === 'ArrowLeft' || k === 'a' || k === 'A') S.keys.left = false;
+        if (k === 'ArrowRight' || k === 'd' || k === 'D') S.keys.right = false;
+      });
+      window.addEventListener('blur', () => { S.keys.left = S.keys.right = false; S.pointers = {}; });
+
+      canvas.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        const p = toGame(e);
+        const hit = hitTest(p);
+        if (!hit) return;
+        if (hit === 'action') { doAction(); return; }
+        canvas.setPointerCapture(e.pointerId);
+        S.pointers[e.pointerId] = hit;
+        if (hit === 'band') dragNeedle(p);
+      });
+      canvas.addEventListener('pointermove', e => {
+        if (S.pointers[e.pointerId] === 'band') dragNeedle(toGame(e));
+      });
+      const release = e => { delete S.pointers[e.pointerId]; };
+      canvas.addEventListener('pointerup', release);
+      canvas.addEventListener('pointercancel', release);
+      canvas.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
+    function toGame(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+    }
+
+    function hitTest(p) {
+      const inCircle = (b) => Math.hypot(p.x - b.x, p.y - b.y) <= b.r + 8;
+      const a = BTN_ACTION;
+      if (p.x >= a.x && p.x <= a.x + a.w && p.y >= a.y && p.y <= a.y + a.h + 6) return 'action';
+      if (inCircle(BTN_LEFT)) return 'left';
+      if (inCircle(BTN_RIGHT)) return 'right';
+      if (S.phase === 'GUESS' && p.x >= BAND.x - 12 && p.x <= BAND.x + BAND.w + 12 &&
+          p.y >= BAND.y - 24 && p.y <= BAND.y + BAND.h + 12) return 'band';
+      return null;
+    }
+
+    function dragNeedle(p) {
+      if (S.phase !== 'GUESS') return;
+      S.needle = clamp((p.x - BAND.x) / BAND.w * 100, 0, 100);
+    }
+
+    // Fit the 480×640 radio to the screen, backing store at device resolution for crisp text
+    function resize() {
+      const fit = Math.min(window.innerWidth / W, window.innerHeight / H);
+      const dpr = window.devicePixelRatio || 1;
+      canvas.style.width = Math.floor(W * fit) + 'px';
+      canvas.style.height = Math.floor(H * fit) + 'px';
+      canvas.width = bg.width = Math.round(W * fit * dpr);
+      canvas.height = bg.height = Math.round(H * fit * dpr);
+      scale = canvas.width / W;
+      ctx.imageSmoothingEnabled = false;
+      renderBackground();
+    }
+
+    // ===== 7. GAME LOOP =====
+    const STEP = 1000 / 60; // fixed 60Hz logic timestep in ms
+    let lastTime = 0, acc = 0;
+
+    function loop(ts) {
+      acc += ts - lastTime;
+      lastTime = ts;
+      while (acc >= STEP) { update(STEP / 1000); acc -= STEP; }
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    handleInput();
+    init('TITLE');
+    requestAnimationFrame(ts => { lastTime = ts; requestAnimationFrame(loop); });
+  </script>
+</body>
+</html>
